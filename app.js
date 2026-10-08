@@ -11,6 +11,151 @@ const users = {
   Drix: { role: "Editor", username: "drix", password: "demo", access: "nicolas" }
 };
 
+const SUPABASE_URL = "https://hbyvddtczxjmjiommlcg.supabase.co";
+const SUPABASE_KEY = "sb_publishable_JpMQkv99uAgopgWsRtxwOA_RWiB6-2S";
+const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
+let remoteEnabled = true;
+
+async function supabaseRequest(path, options = {}) {
+  const response = await fetch(`${SUPABASE_REST_URL}${path}`, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+      ...(options.headers || {})
+    }
+  });
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Supabase request failed: ${response.status}`);
+  }
+  if (response.status === 204) return [];
+  return response.json();
+}
+
+function rebuildAccessLists() {
+  nicolasEditors.splice(0, nicolasEditors.length);
+  mdEditors.splice(0, mdEditors.length);
+  editors.forEach(name => addEditorAccess(name, users[name]?.access || "nicolas"));
+}
+
+async function loadRemoteData() {
+  if (!remoteEnabled) return;
+  try {
+    const remoteEditors = await supabaseRequest("/editors?select=*&order=created_at.asc");
+    if (remoteEditors.length) {
+      editors.splice(0, editors.length);
+      Object.keys(users).forEach(name => delete users[name]);
+      remoteEditors.forEach(editor => {
+        editors.push(editor.name);
+        users[editor.name] = {
+          id: editor.id,
+          role: "Editor",
+          username: editor.username,
+          password: editor.password || "",
+          access: editor.access
+        };
+      });
+      rebuildAccessLists();
+    }
+
+    const remoteProjects = await supabaseRequest("/projects?select=*,editors(name)&order=created_at.asc");
+    projects.splice(0, projects.length, ...remoteProjects.map(project => ({
+      id: project.id,
+      client: project.client,
+      project: project.project_name,
+      type: project.type || "",
+      script: Boolean(project.script_link),
+      raw: Boolean(project.raw_link),
+      scriptLink: project.script_link || "",
+      rawLink: project.raw_link || "",
+      editor: project.editors?.name || "",
+      status: project.status || "",
+      deliverable: project.deliverable_link || ""
+    })));
+    refreshEditorOptions();
+  } catch (error) {
+    remoteEnabled = false;
+    console.warn("Using local data because Supabase is not ready.", error);
+  }
+}
+
+function editorIdByName(name) {
+  return users[name]?.id || null;
+}
+
+async function saveEditorRemote(name) {
+  if (!remoteEnabled) return;
+  const user = users[name];
+  const payload = {
+    name,
+    username: user.username,
+    password: user.password,
+    access: user.access
+  };
+  try {
+    if (user.id) {
+      const [updated] = await supabaseRequest(`/editors?id=eq.${user.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload)
+      });
+      if (updated?.id) user.id = updated.id;
+    } else {
+      const [created] = await supabaseRequest("/editors", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      if (created?.id) user.id = created.id;
+    }
+  } catch (error) {
+    alert("Could not save editor to Supabase. Check your database policies.");
+    console.error(error);
+  }
+}
+
+async function deleteEditorRemote(name) {
+  if (!remoteEnabled || !users[name]?.id) return;
+  try {
+    await supabaseRequest(`/editors?id=eq.${users[name].id}`, { method: "DELETE" });
+  } catch (error) {
+    alert("Could not delete editor from Supabase. Check your database policies.");
+    console.error(error);
+  }
+}
+
+async function saveProjectRemote(project) {
+  if (!remoteEnabled) return;
+  const payload = {
+    client: project.client,
+    project_name: project.project,
+    type: project.type,
+    editor_id: editorIdByName(project.editor),
+    status: project.status || "Ongoing",
+    script_link: project.scriptLink || null,
+    raw_link: project.rawLink || null,
+    deliverable_link: project.deliverable || null
+  };
+  try {
+    if (typeof project.id === "string" && project.id.length > 20) {
+      await supabaseRequest(`/projects?id=eq.${project.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload)
+      });
+    } else {
+      const [created] = await supabaseRequest("/projects", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      if (created?.id) project.id = created.id;
+    }
+  } catch (error) {
+    alert("Could not save project to Supabase. Check your database policies.");
+    console.error(error);
+  }
+}
+
 function saveEditorState() {
   try {
     localStorage.setItem("visualsByEssiEditors", JSON.stringify({
@@ -136,7 +281,7 @@ function findUserByLogin(username) {
 function editorPay(project) {
   if (!project.editor) return 0;
   if (project.client === "Nicolas") return project.type === "Hard" ? 500 : 350;
-  if (["Aimae", "Thea", "Essi"].includes(project.editor)) return 350;
+  if (mdEditors.includes(project.editor)) return 350;
   return 0;
 }
 
@@ -591,14 +736,14 @@ function closeEditorModal() {
   document.querySelector("#editorModal").classList.remove("open");
 }
 
-document.addEventListener("click", (event) => {
+document.addEventListener("click", async (event) => {
   const nav = event.target.closest(".nav-item");
   if (nav) setView(nav.dataset.view);
 
   const actionButtonEl = event.target.closest("[data-action]");
   const action = actionButtonEl?.dataset.action;
   if (action === "take" || action === "release") {
-    const p = projects.find(project => project.id === Number(actionButtonEl.dataset.id));
+    const p = projects.find(project => String(project.id) === actionButtonEl.dataset.id);
     if (!p || p.status === "Paid") return;
     if (action === "take") {
       p.editor = activeEditor;
@@ -609,6 +754,7 @@ document.addEventListener("click", (event) => {
       p.status = "";
       p.deliverable = "";
     }
+    await saveProjectRemote(p);
     renderAll();
   }
 
@@ -630,6 +776,7 @@ document.addEventListener("click", (event) => {
     const name = actionButtonEl.dataset.editor;
     if (name === "Essi") return;
     if (!confirm(`Delete ${name}?`)) return;
+    await deleteEditorRemote(name);
     const editorIndex = editors.indexOf(name);
     if (editorIndex > -1) editors.splice(editorIndex, 1);
     removeEditorAccess(name);
@@ -648,10 +795,13 @@ document.addEventListener("click", (event) => {
   }
 });
 
-document.addEventListener("change", (event) => {
+document.addEventListener("change", async (event) => {
   if (event.target.dataset.action === "status") {
-    const p = projects.find(project => project.id === Number(event.target.dataset.id));
-    if (p && (event.target.dataset.admin === "true" || event.target.value !== "Paid")) p.status = event.target.value;
+    const p = projects.find(project => String(project.id) === event.target.dataset.id);
+    if (p && (event.target.dataset.admin === "true" || event.target.value !== "Paid")) {
+      p.status = event.target.value;
+      await saveProjectRemote(p);
+    }
     renderAll();
   }
 });
@@ -686,7 +836,7 @@ document.querySelector("#loginForm").onsubmit = (event) => {
   }
   applySession(matchedUser);
 };
-document.querySelector("#editorForm").onsubmit = (event) => {
+document.querySelector("#editorForm").onsubmit = async (event) => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.currentTarget).entries());
   const name = data.name.trim();
@@ -704,12 +854,14 @@ document.querySelector("#editorForm").onsubmit = (event) => {
     removeEditorAccess(oldName);
   }
   users[name] = {
+    id: oldName && users[oldName]?.id ? users[oldName].id : users[name]?.id,
     role: "Editor",
     username: data.username.trim() || name.toLowerCase(),
     password: data.password,
     access: data.access
   };
   addEditorAccess(name, data.access);
+  await saveEditorRemote(name);
   saveEditorState();
   refreshEditorOptions();
   closeEditorModal();
@@ -717,23 +869,32 @@ document.querySelector("#editorForm").onsubmit = (event) => {
   renderAll();
   setView("editors");
 };
-document.querySelector("#projectForm").onsubmit = (event) => {
+document.querySelector("#projectForm").onsubmit = async (event) => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.currentTarget).entries());
   if (!isAdmin() && data.client !== "Nicolas") return;
   if (!isAdmin() && !["Easy", "Hard"].includes(data.type)) return;
-  projects.unshift({
+  const project = {
     id: nextId++,
     client: !isAdmin() ? "Nicolas" : data.client,
     project: data.project,
     type: data.type,
     script: !isAdmin() ? false : Boolean(data.script),
     raw: !isAdmin() ? false : Boolean(data.raw),
+    scriptLink: !isAdmin() ? "" : data.script,
+    rawLink: !isAdmin() ? "" : data.raw,
     editor: !isAdmin() ? currentUser : data.editor === "Unassigned" ? "" : data.editor,
     status: !isAdmin() ? "Ongoing" : data.editor === "Unassigned" ? "" : "Ongoing",
     deliverable: ""
-  });
+  };
+  await saveProjectRemote(project);
+  projects.unshift(project);
   event.currentTarget.reset();
   closeModal();
   renderAll();
 };
+
+loadRemoteData().then(() => {
+  renderAll();
+  if (currentUser) setView(currentView);
+});
