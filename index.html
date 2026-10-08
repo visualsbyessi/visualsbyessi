@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Internal Video Tracker</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <section class="login-screen" id="loginScreen">
+      <div class="login-card">
+        <div class="brand login-brand">
+          <span class="brand-mark">E</span>
+          <div>
+            <strong>VISUALS BY ESSI</strong>
+            <small>Project tracker</small>
+          </div>
+        </div>
+        <h1>Welcome back</h1>
+        <form id="loginForm" class="login-form">
+          <label>
+            Username
+            <input name="user" placeholder="Username" autocomplete="username" />
+          </label>
+          <label>
+            Password
+            <input name="password" type="password" placeholder="Password" />
+          </label>
+          <button class="primary-button" type="submit"><span class="button-icon">→</span> Log In</button>
+        </form>
+      </div>
+    </section>
+
+    <div class="app-shell hidden" id="appShell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">E</span>
+          <div>
+            <strong>VISUALS BY ESSI</strong>
+            <small>Project tracker</small>
+          </div>
+        </div>
+
+        <nav class="nav-group" aria-label="Main navigation">
+          <button class="nav-item admin-only active" data-view="dashboard"><span class="nav-icon">⌂</span><span>Dashboard</span></button>
+          <button class="nav-item admin-only" data-view="md"><span class="nav-icon">▣</span><span>Mehdi & Deniss</span></button>
+          <button class="nav-item admin-only" data-view="nicolas"><span class="nav-icon">◆</span><span>Nicolas</span></button>
+          <button class="nav-item admin-only" data-view="editors"><span class="nav-icon">◎</span><span>Editors</span></button>
+          <button class="nav-item" data-view="workspace"><span class="nav-icon">◉</span><span>My Workspace</span></button>
+          <button class="nav-item" data-view="links"><span class="nav-icon">↗</span><span>Quick Links</span></button>
+          <button class="nav-item admin-only" data-view="viewas"><span class="nav-icon">◎</span><span>View As Editor</span></button>
+        </nav>
+
+        <div class="sidebar-card">
+          <span class="label">Account</span>
+          <strong id="signedInName">Essi</strong>
+          <small id="signedInRole">Editor</small>
+          <button class="ghost-button logout-button" id="logoutButton">Log Out</button>
+        </div>
+      </aside>
+
+      <main class="content">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Project tracker</p>
+            <h1 id="page-title">Dashboard</h1>
+          </div>
+          <div class="top-actions">
+            <div id="topEarnings" class="top-earnings hidden"></div>
+            <input id="search" type="search" placeholder="Search projects..." />
+            <button class="primary-button" id="addProjectButton"><span class="button-icon">+</span> Add Project</button>
+          </div>
+        </header>
+
+        <section id="view-dashboard" class="view active-view"></section>
+        <section id="view-md" class="view"></section>
+        <section id="view-nicolas" class="view"></section>
+        <section id="view-editors" class="view"></section>
+        <section id="view-workspace" class="view"></section>
+        <section id="view-links" class="view"></section>
+        <section id="view-viewas" class="view"></section>
+      </main>
+    </div>
+
+    <div class="modal" id="modal" aria-hidden="true">
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-header">
+          <h2 id="modalTitle">Add Project</h2>
+          <button class="icon-button" id="closeModal" aria-label="Close">×</button>
+        </div>
+        <form id="projectForm" class="form-grid">
+          <label data-form-field="client">
+            Client
+            <select name="client">
+              <option>Mehdi</option>
+              <option>Deniss</option>
+              <option>Nicolas</option>
+            </select>
+          </label>
+          <label>
+            Project name
+            <input name="project" required placeholder="Video title" />
+          </label>
+          <label>
+            Type
+            <select name="type">
+              <option>Regular Edit</option>
+              <option>Long Story</option>
+              <option>Easy</option>
+              <option>Hard</option>
+            </select>
+          </label>
+          <label data-form-field="editor">
+            Editor
+            <select name="editor">
+              <option>Unassigned</option>
+              <option>Essi</option>
+              <option>Aimae</option>
+              <option>Thea</option>
+              <option>Siren</option>
+              <option>David</option>
+              <option>Mc</option>
+              <option>Drix</option>
+            </select>
+          </label>
+          <label data-form-field="script">
+            Script link
+            <input name="script" placeholder="Google Docs link" />
+          </label>
+          <label data-form-field="raw">
+            Raw link
+            <input name="raw" placeholder="Optional raw link" />
+          </label>
+          <div class="modal-actions">
+            <button type="button" class="ghost-button" id="cancelModal">Cancel</button>
+            <button type="submit" class="primary-button">Create Project</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal" id="editorModal" aria-hidden="true">
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="editorModalTitle">
+        <div class="modal-header">
+          <h2 id="editorModalTitle">Add Editor</h2>
+          <button class="icon-button" id="closeEditorModal" aria-label="Close">×</button>
+        </div>
+        <form id="editorForm" class="form-grid">
+          <label>
+            Name
+            <input name="name" required placeholder="Editor name" />
+          </label>
+          <label>
+            Username
+            <input name="username" required placeholder="username" autocomplete="username" />
+          </label>
+          <label>
+            Password
+            <input name="password" required type="password" placeholder="password" autocomplete="new-password" />
+          </label>
+          <label>
+            Access
+            <select name="access">
+              <option value="all">All</option>
+              <option value="md">MD</option>
+              <option value="md+nicolas">MD + Nicolas</option>
+              <option value="nicolas">Nicolas</option>
+            </select>
+          </label>
+          <div class="modal-actions">
+            <button type="button" class="ghost-button" id="cancelEditorModal">Cancel</button>
+            <button type="submit" class="primary-button">Create Editor</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
