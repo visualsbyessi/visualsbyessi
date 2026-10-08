@@ -11,6 +11,36 @@ const users = {
   Drix: { role: "Editor", username: "drix", password: "demo", access: "nicolas" }
 };
 
+function saveEditorState() {
+  try {
+    localStorage.setItem("visualsByEssiEditors", JSON.stringify({
+      editors,
+      nicolasEditors,
+      mdEditors,
+      users
+    }));
+  } catch (error) {
+    alert("This browser blocked saving. Please allow site storage or try another browser.");
+  }
+}
+
+function loadEditorState() {
+  const saved = localStorage.getItem("visualsByEssiEditors");
+  if (!saved) return;
+  try {
+    const data = JSON.parse(saved);
+    editors.splice(0, editors.length, ...(data.editors || editors));
+    nicolasEditors.splice(0, nicolasEditors.length, ...(data.nicolasEditors || nicolasEditors));
+    mdEditors.splice(0, mdEditors.length, ...(data.mdEditors || mdEditors));
+    Object.keys(users).forEach(name => delete users[name]);
+    Object.assign(users, data.users || {});
+  } catch (error) {
+    console.warn("Could not load saved editor data.", error);
+  }
+}
+
+loadEditorState();
+
 let currentUser = null;
 let activeEditor = "Essi";
 let previewEditor = "Essi";
@@ -403,7 +433,8 @@ function renderEditors() {
           <tbody>
             ${editors.map(name => {
               const user = users[name] || {};
-              return `<tr><td><strong>${name}</strong></td><td>${user.username || name.toLowerCase()}</td><td>${accessLabel(user.access || "nicolas")}</td><td>${user.password || "demo"}</td><td><button class="ghost-button" data-action="edit-editor" data-editor="${name}">${icon("file")} Edit</button></td></tr>`;
+              const deleteButton = name === "Essi" ? `<button class="ghost-button" disabled>${icon("lock")} Locked</button>` : `<button class="danger-button" data-action="delete-editor" data-editor="${name}">${icon("release")} Delete</button>`;
+              return `<tr><td><strong>${name}</strong></td><td>${user.username || name.toLowerCase()}</td><td>${accessLabel(user.access || "nicolas")}</td><td>${user.password || "demo"}</td><td class="row-actions"><button class="ghost-button" data-action="edit-editor" data-editor="${name}">${icon("file")} Edit</button>${deleteButton}</td></tr>`;
             }).join("")}
           </tbody>
         </table>
@@ -564,9 +595,10 @@ document.addEventListener("click", (event) => {
   const nav = event.target.closest(".nav-item");
   if (nav) setView(nav.dataset.view);
 
-  const action = event.target.dataset.action;
+  const actionButtonEl = event.target.closest("[data-action]");
+  const action = actionButtonEl?.dataset.action;
   if (action === "take" || action === "release") {
-    const p = projects.find(project => project.id === Number(event.target.dataset.id));
+    const p = projects.find(project => project.id === Number(actionButtonEl.dataset.id));
     if (!p || p.status === "Paid") return;
     if (action === "take") {
       p.editor = activeEditor;
@@ -586,12 +618,33 @@ document.addEventListener("click", (event) => {
     renderAll();
   }
 
-  if (event.target.dataset.action === "add-nicolas") {
+  if (action === "add-nicolas") {
     openModal("Nicolas");
   }
 
-  if (event.target.dataset.action === "edit-editor") {
-    openEditorModal(event.target.dataset.editor);
+  if (action === "edit-editor") {
+    openEditorModal(actionButtonEl.dataset.editor);
+  }
+
+  if (action === "delete-editor") {
+    const name = actionButtonEl.dataset.editor;
+    if (name === "Essi") return;
+    if (!confirm(`Delete ${name}?`)) return;
+    const editorIndex = editors.indexOf(name);
+    if (editorIndex > -1) editors.splice(editorIndex, 1);
+    removeEditorAccess(name);
+    delete users[name];
+    projects.forEach(project => {
+      if (project.editor === name) {
+        project.editor = "";
+        project.status = "";
+        project.deliverable = "";
+      }
+    });
+    saveEditorState();
+    refreshEditorOptions();
+    renderAll();
+    setView("editors");
   }
 });
 
@@ -657,6 +710,7 @@ document.querySelector("#editorForm").onsubmit = (event) => {
     access: data.access
   };
   addEditorAccess(name, data.access);
+  saveEditorState();
   refreshEditorOptions();
   closeEditorModal();
   event.currentTarget.reset();
