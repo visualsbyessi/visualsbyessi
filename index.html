@@ -133,7 +133,7 @@
           </label>
           <div class="modal-actions">
             <button type="button" class="ghost-button" id="cancelModal">Cancel</button>
-            <button type="submit" class="primary-button">Create Project</button>
+            <button type="submit" class="primary-button" id="projectSubmitButton">Create Project</button>
           </div>
         </form>
       </div>
@@ -170,6 +170,42 @@
           <div class="modal-actions">
             <button type="button" class="ghost-button" id="cancelEditorModal">Cancel</button>
             <button type="submit" class="primary-button">Create Editor</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal" id="linkModal" aria-hidden="true">
+      <div class="modal-panel link-modal-panel" role="dialog" aria-modal="true" aria-labelledby="linkModalTitle">
+        <div class="modal-header">
+          <h2 id="linkModalTitle">Add Link</h2>
+          <button class="icon-button" id="closeLinkModal" aria-label="Close">×</button>
+        </div>
+        <form id="linkForm" class="form-grid">
+          <label>
+            Title
+            <input name="title" required placeholder="Link title" />
+          </label>
+          <label>
+            Description
+            <input name="description" required placeholder="Short description" />
+          </label>
+          <label>
+            Client
+            <select name="client">
+              <option>All</option>
+              <option>Mehdi & Deniss</option>
+              <option>Nicolas</option>
+              <option>Private</option>
+            </select>
+          </label>
+          <label class="full-field">
+            Link
+            <input name="url" required type="url" placeholder="https://..." />
+          </label>
+          <div class="modal-actions">
+            <button type="button" class="ghost-button" id="cancelLinkModal">Cancel</button>
+            <button type="submit" class="primary-button">Add Link</button>
           </div>
         </form>
       </div>
