@@ -211,7 +211,8 @@ async function saveQuickLinkRemote(link) {
     category: "Quick Link"
   };
   try {
-    if (typeof link.id === "string" && link.id.length > 20) {
+    const hasRemoteId = typeof link.id === "string" && link.id.length > 20 && !link.id.startsWith("local-") && !link.id.startsWith("sample-");
+    if (hasRemoteId) {
       await supabaseRequest(`/quick_links?id=eq.${link.id}`, {
         method: "PATCH",
         body: JSON.stringify(payload)
