@@ -1131,7 +1131,7 @@ document.querySelector("#toggleLoginPassword").onclick = () => {
   const button = document.querySelector("#toggleLoginPassword");
   const showing = input.type === "text";
   input.type = showing ? "password" : "text";
-  button.textContent = showing ? "Show" : "Hide";
+  button.classList.toggle("is-showing", !showing);
   button.setAttribute("aria-label", showing ? "Show password" : "Hide password");
 };
 document.querySelector("#loginForm").onsubmit = (event) => {

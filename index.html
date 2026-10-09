@@ -26,7 +26,12 @@
             Password
             <div class="password-wrap">
               <input id="loginPassword" name="password" type="password" placeholder="Password" />
-              <button type="button" id="toggleLoginPassword" class="password-toggle" aria-label="Show password">Show</button>
+              <button type="button" id="toggleLoginPassword" class="password-toggle" aria-label="Show password">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
             </div>
           </label>
           <button class="primary-button" type="submit"><span class="button-icon">→</span> Log In</button>
