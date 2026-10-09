@@ -532,7 +532,6 @@ function saveQuickLinkOrderFromDom() {
 }
 
 function initQuickLinkDrag() {
-  if (!isAdmin()) return;
   document.querySelectorAll(".quick-link[data-link-id]").forEach(card => {
     card.draggable = true;
     card.addEventListener("dragstart", event => {
