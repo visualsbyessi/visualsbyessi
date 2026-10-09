@@ -327,6 +327,7 @@ let editingProjectId = null;
 let editingLinkId = null;
 const selectedProjectIds = new Set();
 let nextId = 15;
+const defaultNavOrder = ["dashboard", "md", "nicolas", "editors", "workspace", "links", "viewas"];
 
 const projects = [
   { id: 1, client: "Deniss", project: "Shorts Batch 41", type: "Regular Edit", script: true, raw: true, editor: "Aimae", status: "Ongoing", deliverable: "" },
@@ -462,6 +463,56 @@ function canSeeQuickLink(link, user = currentUser) {
   if (client === "Nicolas") return nicolasEditors.includes(user);
   if (client === "Mehdi & Deniss") return mdEditors.includes(user);
   return false;
+}
+
+function saveNavOrder() {
+  const order = [...document.querySelectorAll(".nav-item")].map(item => item.dataset.view);
+  localStorage.setItem("visualsByEssiNavOrder", JSON.stringify(order));
+}
+
+function applyNavOrder() {
+  const nav = document.querySelector(".nav-group");
+  if (!nav) return;
+  let order = defaultNavOrder;
+  try {
+    const saved = JSON.parse(localStorage.getItem("visualsByEssiNavOrder") || "[]");
+    if (Array.isArray(saved) && saved.length) {
+      order = [...saved.filter(view => defaultNavOrder.includes(view)), ...defaultNavOrder.filter(view => !saved.includes(view))];
+    }
+  } catch (error) {
+    order = defaultNavOrder;
+  }
+  order.forEach(view => {
+    const item = nav.querySelector(`[data-view="${view}"]`);
+    if (item) nav.appendChild(item);
+  });
+}
+
+function initNavDrag() {
+  const nav = document.querySelector(".nav-group");
+  if (!nav) return;
+  nav.querySelectorAll(".nav-item").forEach(item => {
+    item.draggable = true;
+    item.addEventListener("dragstart", event => {
+      event.dataTransfer.setData("text/plain", item.dataset.view);
+      item.classList.add("dragging");
+    });
+    item.addEventListener("dragend", () => {
+      item.classList.remove("dragging");
+      saveNavOrder();
+    });
+  });
+  nav.addEventListener("dragover", event => {
+    event.preventDefault();
+    const dragging = nav.querySelector(".dragging");
+    if (!dragging) return;
+    const afterElement = [...nav.querySelectorAll(".nav-item:not(.dragging)")].find(item => {
+      const box = item.getBoundingClientRect();
+      return event.clientY < box.top + box.height / 2;
+    });
+    if (afterElement) nav.insertBefore(dragging, afterElement);
+    else nav.appendChild(dragging);
+  });
 }
 
 function formatDuration(minutes = 0) {
@@ -664,7 +715,7 @@ function renderDashboard() {
       <div class="card"><span class="card-icon">${icon("wallet")}</span><span class="label">Invoice total</span><strong>${money(invoices)}</strong><small>Total billable</small></div>
     </div>
     <div class="two-col">
-      <div class="panel breakdown-table">
+      <div class="panel breakdown-table payout-table">
         <div class="panel-header"><h2>Client Invoice Breakdown</h2></div>
         <div class="breakdown-scroll">
           <table>
@@ -1262,6 +1313,8 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
 };
 
 loadQuickLinks();
+applyNavOrder();
+initNavDrag();
 
 loadRemoteData().then(() => {
   const savedSession = localStorage.getItem("visualsByEssiSession");
