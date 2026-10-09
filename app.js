@@ -320,6 +320,7 @@ let activeEditor = "Essi";
 let previewEditor = "Essi";
 let workspaceMode = "mine";
 let workspaceStatusFilter = "all";
+let clientStatusFilters = { md: "all", nicolas: "all" };
 let currentView = "dashboard";
 let searchTerm = "";
 let editingEditorName = null;
@@ -671,6 +672,17 @@ function summaryCards(c, activeFilter = "total") {
   `;
 }
 
+function filterRowsByStatus(rows, filter) {
+  return rows.filter(project => {
+    if (filter === "all") return true;
+    if (filter === "ongoing") return project.status === "Ongoing";
+    if (filter === "checking") return project.status === "For Checking";
+    if (filter === "revision") return ["Revision", "For Revision"].includes(project.status);
+    if (filter === "done") return ["Done", "Paid"].includes(project.status);
+    return true;
+  });
+}
+
 function earningsCard(editor) {
   const e = earningsFor(editor);
   return `
@@ -754,15 +766,18 @@ function renderDashboard() {
 
 function renderClientPage(id, title, rows) {
   const isNicolasPage = id === "#view-nicolas";
+  const filterKey = isNicolasPage ? "nicolas" : "md";
+  const activeFilter = clientStatusFilters[filterKey] || "all";
+  const visibleRows = filterRowsByStatus(rows, activeFilter);
   const canAdd = isAdmin() || (isNicolasPage && canCreateNicolasProject());
   document.querySelector(id).innerHTML = `
-    <div class="cards">${summaryCards(counts(rows)).replace("grid", "")}</div>
+    <div class="cards filter-summary" data-client-filter="${filterKey}">${summaryCards(counts(rows), activeFilter).replace("grid", "")}</div>
     <div class="panel">
       <div class="panel-header">
         <div><h2>${title}</h2></div>
         ${canAdd ? `<button class="primary-button inline-add" data-client="${isNicolasPage ? "Nicolas" : ""}">${icon("plus")} Add Project</button>` : ""}
       </div>
-      ${projectTable(rows, { admin: true, includeClient: !isNicolasPage, includeScriptRaw: !isNicolasPage, includeDeliverable: !isNicolasPage })}
+      ${projectTable(visibleRows, { admin: true, includeClient: !isNicolasPage, includeScriptRaw: !isNicolasPage, includeDeliverable: !isNicolasPage })}
     </div>
   `;
   document.querySelectorAll(".inline-add").forEach(add => {
@@ -774,14 +789,7 @@ function renderWorkspace(editor = activeEditor, target = "#view-workspace") {
   const rows = projects.filter(p => p.editor === editor || (!p.editor && allowedEditors(p.client).includes(editor)));
   const addNicolas = canCreateNicolasProject(editor) && target === "#view-workspace";
   const modeRows = workspaceMode === "all" ? rows : workspaceMode === "available" ? rows.filter(p => !p.editor) : rows.filter(p => p.editor === editor);
-  const visibleRows = modeRows.filter(project => {
-    if (workspaceStatusFilter === "all") return true;
-    if (workspaceStatusFilter === "ongoing") return project.status === "Ongoing";
-    if (workspaceStatusFilter === "checking") return project.status === "For Checking";
-    if (workspaceStatusFilter === "revision") return ["Revision", "For Revision"].includes(project.status);
-    if (workspaceStatusFilter === "done") return ["Done", "Paid"].includes(project.status);
-    return true;
-  });
+  const visibleRows = filterRowsByStatus(modeRows, workspaceStatusFilter);
   const nicolasOnly = visibleRows.length > 0 && visibleRows.every(p => p.client === "Nicolas");
   document.querySelector(target).innerHTML = `
     <div class="cards workspace-summary" data-workspace-cards="true">
@@ -1082,7 +1090,12 @@ document.addEventListener("click", async (event) => {
 
   const filterCard = event.target.closest("[data-status-filter]");
   if (filterCard) {
-    workspaceStatusFilter = filterCard.dataset.statusFilter;
+    const clientGroup = filterCard.closest("[data-client-filter]");
+    if (clientGroup) {
+      clientStatusFilters[clientGroup.dataset.clientFilter] = filterCard.dataset.statusFilter;
+    } else {
+      workspaceStatusFilter = filterCard.dataset.statusFilter;
+    }
     renderAll();
     setView(currentView);
   }
