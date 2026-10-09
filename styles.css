@@ -956,25 +956,32 @@ tr.row-selected {
   table-layout: fixed;
 }
 
+.payout-table table {
+  min-width: 0 !important;
+}
+
 .payout-table th,
 .payout-table td {
-  padding: 10px 10px;
+  padding: 9px 4px;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .payout-table th:nth-child(1),
 .payout-table td:nth-child(1) {
-  width: 42%;
+  width: 38%;
 }
 
 .payout-table th:nth-child(2),
 .payout-table td:nth-child(2) {
-  width: 23%;
+  width: 18%;
   text-align: center;
 }
 
 .payout-table th:nth-child(3),
 .payout-table td:nth-child(3) {
-  width: 35%;
+  width: 44%;
   text-align: right;
 }
 

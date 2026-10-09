@@ -715,7 +715,7 @@ function renderDashboard() {
       <div class="card"><span class="card-icon">${icon("wallet")}</span><span class="label">Invoice total</span><strong>${money(invoices)}</strong><small>Total billable</small></div>
     </div>
     <div class="two-col">
-      <div class="panel breakdown-table payout-table">
+      <div class="panel breakdown-table">
         <div class="panel-header"><h2>Client Invoice Breakdown</h2></div>
         <div class="breakdown-scroll">
           <table>
@@ -729,7 +729,7 @@ function renderDashboard() {
           </table>
         </div>
       </div>
-      <div class="panel breakdown-table">
+      <div class="panel breakdown-table payout-table">
         <div class="panel-header"><h2>Editor Payouts</h2></div>
         <div class="breakdown-scroll">
           <table>
