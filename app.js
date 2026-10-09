@@ -82,16 +82,14 @@ async function loadRemoteData() {
     await cleanupExpiredPaidProjects();
 
     const remoteLinks = await supabaseRequest("/quick_links?select=*&order=created_at.desc");
-    if (remoteLinks.length) {
-      quickLinks.splice(0, quickLinks.length, ...remoteLinks.map(link => ({
-        id: link.id,
-        name: link.name || link.title,
-        client: link.client || link.visible || "All",
-        notes: link.notes || link.description || "",
-        url: link.url || "#"
-      })));
-      saveQuickLinks();
-    }
+    quickLinks.splice(0, quickLinks.length, ...remoteLinks.map(link => ({
+      id: link.id,
+      name: link.name || link.title,
+      client: link.client || link.visible || "All",
+      notes: link.notes || link.description || "",
+      url: link.url || "#"
+    })));
+    saveQuickLinks();
     refreshEditorOptions();
   } catch (error) {
     remoteEnabled = false;
@@ -1091,12 +1089,12 @@ document.addEventListener("click", async (event) => {
     const link = quickLinks.find(item => String(item.id) === actionButtonEl.dataset.id);
     if (!link) return;
     if (!confirm(`Delete ${link.name}?`)) return;
-    await deleteQuickLinkRemote(link);
     const index = quickLinks.findIndex(item => String(item.id) === String(link.id));
     if (index > -1) quickLinks.splice(index, 1);
     saveQuickLinks();
     renderAll();
     setView("links");
+    deleteQuickLinkRemote(link).then(saveQuickLinks);
   }
 
   if (action === "edit-editor") {
