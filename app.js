@@ -14,6 +14,7 @@ const users = {
 const SUPABASE_URL = "https://hbyvddtczxjmjiommlcg.supabase.co";
 const SUPABASE_KEY = "sb_publishable_JpMQkv99uAgopgWsRtxwOA_RWiB6-2S";
 const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
+const DISCORD_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/discord-notify`;
 let remoteEnabled = true;
 let remotePaidAtEnabled = true;
 const PAID_DELETE_AFTER_DAYS = 7;
@@ -38,9 +39,24 @@ async function supabaseRequest(path, options = {}) {
 }
 
 function rebuildAccessLists() {
+  dedupeEditors();
   nicolasEditors.splice(0, nicolasEditors.length);
   mdEditors.splice(0, mdEditors.length);
   editors.forEach(name => addEditorAccess(name, users[name]?.access || "nicolas"));
+}
+
+function dedupeEditors() {
+  const seen = new Set();
+  for (let index = editors.length - 1; index >= 0; index -= 1) {
+    const cleanName = String(editors[index] || "").trim();
+    const key = cleanName.toLowerCase();
+    if (!cleanName || seen.has(key)) {
+      editors.splice(index, 1);
+      continue;
+    }
+    editors[index] = cleanName;
+    seen.add(key);
+  }
 }
 
 async function loadRemoteData() {
@@ -263,6 +279,7 @@ async function cleanupExpiredPaidProjects() {
 }
 
 function saveEditorState() {
+  dedupeEditors();
   try {
     localStorage.setItem("visualsByEssiEditors", JSON.stringify({
       editors,
@@ -285,6 +302,7 @@ function loadEditorState() {
     mdEditors.splice(0, mdEditors.length, ...(data.mdEditors || mdEditors));
     Object.keys(users).forEach(name => delete users[name]);
     Object.assign(users, data.users || {});
+    rebuildAccessLists();
   } catch (error) {
     console.warn("Could not load saved editor data.", error);
   }
@@ -332,6 +350,57 @@ function discordMentionsForClient(client, exceptName = "") {
   return editorsForProjectClient(client)
     .filter(name => name !== exceptName && users[name]?.discordId)
     .map(name => discordMention(name));
+}
+
+function discordProjectContent(action, project, actor = currentUser || "Essi", previousStatus = "") {
+  const projectTitle = project.project || "Untitled project";
+  const details = [
+    `Client: ${project.client}`,
+    `Project: ${projectTitle}`,
+    project.type ? `Type: ${project.type}` : "",
+    project.editor ? `Editor: ${project.editor}` : "",
+    project.status ? `Status: ${project.status}` : ""
+  ].filter(Boolean).join("\n");
+  const otherEditors = discordMentionsForClient(project.client, actor).join(" ");
+  const adminMention = users.Essi?.discordId ? discordMention("Essi") : "";
+  const assignedMention = project.editor && users[project.editor]?.discordId ? discordMention(project.editor) : "";
+
+  if (action === "take") return `🎬 ${actor} took a project.\n${details}${otherEditors ? `\n\n${otherEditors}` : ""}`;
+  if (action === "release") return `↩️ ${actor} released a project.\n${details}${otherEditors ? `\n\n${otherEditors}` : ""}`;
+  if (action === "add_nicolas") return `➕ ${actor} added a Nicolas project.\n${details}${otherEditors ? `\n\n${otherEditors}` : ""}`;
+  if (action === "ongoing") return `▶️ ${actor} started working on a project.\n${details}`;
+  if (action === "checking") return `🔎 Project is ready for checking.${adminMention ? ` ${adminMention}` : ""}\n${details}`;
+  if (action === "revision") return `🔁 Project needs revision.${assignedMention ? ` ${assignedMention}` : ""}\n${details}`;
+  if (action === "paid") return `✅ Project marked paid.${assignedMention ? ` ${assignedMention}` : ""}\n${details}`;
+  return `Project updated${previousStatus ? ` from ${previousStatus}` : ""}.\n${details}`;
+}
+
+async function sendDiscordUpdate(action, project, actor = currentUser || "Essi", previousStatus = "") {
+  try {
+    await fetch(DISCORD_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        content: discordProjectContent(action, project, actor, previousStatus),
+        action,
+        actor,
+        previousStatus,
+        project: {
+          id: project.id,
+          client: project.client,
+          project: project.project,
+          type: project.type,
+          editor: project.editor,
+          status: project.status
+        }
+      })
+    });
+  } catch (error) {
+    console.warn("Discord notification was not sent.", error);
+  }
 }
 
 function applyTheme(theme = currentTheme) {
@@ -421,8 +490,13 @@ function allowedEditors(client) {
   return mdEditors;
 }
 
+function editorNameExists(name) {
+  const key = String(name || "").trim().toLowerCase();
+  return editors.some(editor => editor.toLowerCase() === key);
+}
+
 function addEditorAccess(name, access) {
-  if (!editors.includes(name)) editors.push(name);
+  if (!editorNameExists(name)) editors.push(name);
   const hasNicolas = ["nicolas", "md+nicolas", "all"].includes(access);
   const hasMd = ["md", "md+nicolas", "all"].includes(access);
   if (hasNicolas && !nicolasEditors.includes(name)) nicolasEditors.push(name);
@@ -1173,8 +1247,9 @@ document.addEventListener("click", async (event) => {
   if (action === "take" || action === "release") {
     const p = projects.find(project => String(project.id) === actionButtonEl.dataset.id);
     if (!p || p.status === "Paid") return;
+    const actor = activeEditor || currentUser || "Essi";
     if (action === "take") {
-      p.editor = activeEditor;
+      p.editor = actor;
       p.status = "Ongoing";
     }
     if (action === "release") {
@@ -1183,6 +1258,7 @@ document.addEventListener("click", async (event) => {
       p.deliverable = "";
     }
     await saveProjectRemote(p);
+    sendDiscordUpdate(action, p, actor);
     renderAll();
   }
 
@@ -1310,10 +1386,21 @@ document.addEventListener("change", async (event) => {
   if (event.target.dataset.action === "status") {
     const p = projects.find(project => String(project.id) === event.target.dataset.id);
     if (p && (event.target.dataset.admin === "true" || event.target.value !== "Paid")) {
+      const previousStatus = p.status || "";
       p.status = event.target.value;
       if (p.status === "Paid" && !p.paidAt) p.paidAt = new Date().toISOString();
       if (p.status !== "Paid") p.paidAt = "";
       await saveProjectRemote(p);
+      if (previousStatus !== p.status) {
+        const statusAction = ({
+          "Ongoing": "ongoing",
+          "For Checking": "checking",
+          "For Revision": "revision",
+          "Revision": "revision",
+          "Paid": "paid"
+        })[p.status];
+        if (statusAction) sendDiscordUpdate(statusAction, p, currentUser || activeEditor || "Essi", previousStatus);
+      }
     }
     await cleanupExpiredPaidProjects();
     renderAll();
@@ -1376,7 +1463,7 @@ document.querySelector("#editorForm").onsubmit = async (event) => {
     removeEditorAccess(oldName);
   } else if (oldName) {
     removeEditorAccess(oldName);
-  } else if (!editors.includes(name)) {
+  } else if (!editorNameExists(name)) {
     editors.push(name);
   }
   users[name] = {
@@ -1452,6 +1539,9 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
   renderAll();
   setView(currentView);
   saveProjectRemote(project).then(() => {
+    if (!existingProject && selectedClient === "Nicolas" && !isAdmin()) {
+      sendDiscordUpdate("add_nicolas", project, currentUser || project.editor || "Essi");
+    }
     renderAll();
     setView(currentView);
   });
