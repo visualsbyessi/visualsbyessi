@@ -144,6 +144,9 @@ button, input, select { font: inherit; }
   border-radius: 13px;
   object-fit: cover;
   flex: 0 0 auto;
+  border: 2px solid var(--green);
+  background: #fff;
+  padding: 3px;
   box-shadow: 0 10px 22px rgba(3, 75, 43, 0.12);
 }
 
