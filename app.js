@@ -231,10 +231,10 @@ async function saveQuickLinkRemote(link) {
 
 async function deleteQuickLinkRemote(link) {
   if (!remoteEnabled || !(typeof link.id === "string" && link.id.length > 20)) return;
+  if (String(link.id).startsWith("sample-") || String(link.id).startsWith("local-")) return;
   try {
     await supabaseRequest(`/quick_links?id=eq.${link.id}`, { method: "DELETE" });
   } catch (error) {
-    alert("Could not delete quick link from Supabase. Check your database policies.");
     console.error(error);
   }
 }
@@ -1128,11 +1128,8 @@ document.querySelector("#cancelLinkModal").onclick = closeLinkModal;
 document.querySelector("#logoutButton").onclick = endSession;
 document.querySelector("#toggleLoginPassword").onclick = () => {
   const input = document.querySelector("#loginPassword");
-  const button = document.querySelector("#toggleLoginPassword");
-  const showing = input.type === "text";
-  input.type = showing ? "password" : "text";
-  button.classList.toggle("is-showing", !showing);
-  button.setAttribute("aria-label", showing ? "Show password" : "Hide password");
+  const checkbox = document.querySelector("#toggleLoginPassword");
+  input.type = checkbox.checked ? "text" : "password";
 };
 document.querySelector("#loginForm").onsubmit = (event) => {
   event.preventDefault();

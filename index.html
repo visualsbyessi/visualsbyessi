@@ -10,7 +10,7 @@
     <section class="login-screen" id="loginScreen">
       <div class="login-card">
         <div class="brand login-brand">
-          <span class="brand-mark">E</span>
+          <img class="brand-logo" src="./visuals-by-essi-logo.png" alt="VISUALS BY ESSI logo" />
           <div>
             <strong>VISUALS BY ESSI</strong>
             <small>Project tracker</small>
@@ -24,15 +24,11 @@
           </label>
           <label>
             Password
-            <div class="password-wrap">
-              <input id="loginPassword" name="password" type="password" placeholder="Password" />
-              <button type="button" id="toggleLoginPassword" class="password-toggle" aria-label="Show password">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"></path>
-                  <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-              </button>
-            </div>
+            <input id="loginPassword" name="password" type="password" placeholder="Password" />
+          </label>
+          <label class="show-password-row">
+            <input id="toggleLoginPassword" type="checkbox" />
+            <span>Show password</span>
           </label>
           <button class="primary-button" type="submit"><span class="button-icon">→</span> Log In</button>
         </form>
@@ -42,7 +38,7 @@
     <div class="app-shell hidden" id="appShell">
       <aside class="sidebar">
         <div class="brand">
-          <span class="brand-mark">E</span>
+          <img class="brand-logo" src="./visuals-by-essi-logo.png" alt="VISUALS BY ESSI logo" />
           <div>
             <strong>VISUALS BY ESSI</strong>
             <small>Project tracker</small>
