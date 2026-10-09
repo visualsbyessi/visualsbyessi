@@ -939,11 +939,39 @@ tr.row-selected {
 }
 
 .quick-link {
+  position: relative;
   padding: 18px;
   background: var(--green);
   color: #fff;
   border-color: rgba(3, 75, 43, 0.25);
   box-shadow: 0 18px 34px rgba(3, 75, 43, 0.16);
+}
+
+.quick-link-actions {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+}
+
+.quick-link-actions + h3 {
+  padding-right: 82px;
+}
+
+.light-icon {
+  width: 30px;
+  height: 30px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.light-icon:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+.danger-light {
+  color: #ffd7dc;
 }
 
 .quick-link h3,
@@ -974,6 +1002,28 @@ tr.row-selected {
 
 .full-field {
   grid-column: 1 / -1;
+}
+
+.password-wrap {
+  position: relative;
+}
+
+.password-wrap input {
+  padding-right: 76px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 9px;
+  padding: 7px 10px;
+  color: var(--green);
+  background: var(--green-soft);
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .modal {

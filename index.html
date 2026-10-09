@@ -24,7 +24,10 @@
           </label>
           <label>
             Password
-            <input name="password" type="password" placeholder="Password" />
+            <div class="password-wrap">
+              <input id="loginPassword" name="password" type="password" placeholder="Password" />
+              <button type="button" id="toggleLoginPassword" class="password-toggle" aria-label="Show password">Show</button>
+            </div>
           </label>
           <button class="primary-button" type="submit"><span class="button-icon">→</span> Log In</button>
         </form>
@@ -205,7 +208,7 @@
           </label>
           <div class="modal-actions">
             <button type="button" class="ghost-button" id="cancelLinkModal">Cancel</button>
-            <button type="submit" class="primary-button">Add Link</button>
+            <button type="submit" class="primary-button" id="linkSubmitButton">Add Link</button>
           </div>
         </form>
       </div>

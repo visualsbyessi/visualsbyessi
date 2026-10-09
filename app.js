@@ -211,13 +211,30 @@ async function saveQuickLinkRemote(link) {
     category: "Quick Link"
   };
   try {
-    const [created] = await supabaseRequest("/quick_links", {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
-    if (created?.id) link.id = created.id;
+    if (typeof link.id === "string" && link.id.length > 20) {
+      await supabaseRequest(`/quick_links?id=eq.${link.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload)
+      });
+    } else {
+      const [created] = await supabaseRequest("/quick_links", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      if (created?.id) link.id = created.id;
+    }
   } catch (error) {
     alert("Could not save quick link to Supabase. Check the quick_links table update.");
+    console.error(error);
+  }
+}
+
+async function deleteQuickLinkRemote(link) {
+  if (!remoteEnabled || !(typeof link.id === "string" && link.id.length > 20)) return;
+  try {
+    await supabaseRequest(`/quick_links?id=eq.${link.id}`, { method: "DELETE" });
+  } catch (error) {
+    alert("Could not delete quick link from Supabase. Check your database policies.");
     console.error(error);
   }
 }
@@ -283,6 +300,7 @@ function loadQuickLinks() {
     const links = JSON.parse(saved);
     if (Array.isArray(links)) {
       quickLinks.splice(0, quickLinks.length, ...links.map(link => ({
+        id: link.id || `local-${crypto.randomUUID()}`,
         name: link.name,
         client: link.client || link.visible || "All",
         notes: link.notes,
@@ -304,6 +322,7 @@ let currentView = "dashboard";
 let searchTerm = "";
 let editingEditorName = null;
 let editingProjectId = null;
+let editingLinkId = null;
 const selectedProjectIds = new Set();
 let nextId = 15;
 
@@ -325,12 +344,12 @@ const projects = [
 ];
 
 const quickLinks = [
-  { name: "Main Upload Folder", client: "All", notes: "Final exports and handoff files", url: "#" },
-  { name: "Editing Guidelines", client: "All", notes: "General editing standards", url: "#" },
-  { name: "Caption Style Guide", client: "All", notes: "Caption format and styling", url: "#" },
-  { name: "Deniss Script Folder", client: "Mehdi & Deniss", notes: "Scripts for Deniss work", url: "#" },
-  { name: "Nicolas References", client: "Nicolas", notes: "Sample edits and references", url: "#" },
-  { name: "Rate Sheet", client: "Private", notes: "Rates and payouts", url: "#" }
+  { id: "sample-1", name: "Main Upload Folder", client: "All", notes: "Final exports and handoff files", url: "#" },
+  { id: "sample-2", name: "Editing Guidelines", client: "All", notes: "General editing standards", url: "#" },
+  { id: "sample-3", name: "Caption Style Guide", client: "All", notes: "Caption format and styling", url: "#" },
+  { id: "sample-4", name: "Deniss Script Folder", client: "Mehdi & Deniss", notes: "Scripts for Deniss work", url: "#" },
+  { id: "sample-5", name: "Nicolas References", client: "Nicolas", notes: "Sample edits and references", url: "#" },
+  { id: "sample-6", name: "Rate Sheet", client: "Private", notes: "Rates and payouts", url: "#" }
 ];
 
 const statusOptions = ["Ongoing", "For Checking", "Revision", "For Revision", "Done", "Paid"];
@@ -715,6 +734,12 @@ function renderLinks() {
       <div class="grid quick-links">
         ${visibleLinks.map(link => `
           <div class="card quick-link">
+            ${isAdmin() ? `
+              <div class="quick-link-actions">
+                <button class="icon-action light-icon" data-action="edit-link" data-id="${link.id}" title="Edit">${icon("pen")}</button>
+                <button class="icon-action light-icon danger-light" data-action="delete-link" data-id="${link.id}" title="Delete">${icon("trash")}</button>
+              </div>
+            ` : ""}
             <h3>${link.name}</h3>
             <p>${link.notes}</p>
             <a href="${link.url || "#"}" target="_blank" rel="noopener" class="linkish">${icon("link")} Open link</a>
@@ -922,12 +947,24 @@ function closeEditorModal() {
   document.querySelector("#editorModal").classList.remove("open");
 }
 
-function openLinkModal() {
-  document.querySelector("#linkForm").reset();
+function openLinkModal(linkId = "") {
+  editingLinkId = linkId || null;
+  const form = document.querySelector("#linkForm");
+  const link = quickLinks.find(item => String(item.id) === String(editingLinkId));
+  form.reset();
+  document.querySelector("#linkModalTitle").textContent = link ? "Edit Link" : "Add Link";
+  document.querySelector("#linkSubmitButton").textContent = link ? "Save Link" : "Add Link";
+  if (link) {
+    form.elements.title.value = link.name || "";
+    form.elements.description.value = link.notes || "";
+    form.elements.client.value = link.client || "All";
+    form.elements.url.value = link.url || "";
+  }
   document.querySelector("#linkModal").classList.add("open");
 }
 
 function closeLinkModal() {
+  editingLinkId = null;
   document.querySelector("#linkModal").classList.remove("open");
 }
 
@@ -965,6 +1002,22 @@ document.addEventListener("click", async (event) => {
 
   if (action === "add-link") {
     openLinkModal();
+  }
+
+  if (action === "edit-link") {
+    openLinkModal(actionButtonEl.dataset.id);
+  }
+
+  if (action === "delete-link") {
+    const link = quickLinks.find(item => String(item.id) === actionButtonEl.dataset.id);
+    if (!link) return;
+    if (!confirm(`Delete ${link.name}?`)) return;
+    await deleteQuickLinkRemote(link);
+    const index = quickLinks.findIndex(item => String(item.id) === String(link.id));
+    if (index > -1) quickLinks.splice(index, 1);
+    saveQuickLinks();
+    renderAll();
+    setView("links");
   }
 
   if (action === "edit-editor") {
@@ -1073,6 +1126,14 @@ document.querySelector("#cancelEditorModal").onclick = closeEditorModal;
 document.querySelector("#closeLinkModal").onclick = closeLinkModal;
 document.querySelector("#cancelLinkModal").onclick = closeLinkModal;
 document.querySelector("#logoutButton").onclick = endSession;
+document.querySelector("#toggleLoginPassword").onclick = () => {
+  const input = document.querySelector("#loginPassword");
+  const button = document.querySelector("#toggleLoginPassword");
+  const showing = input.type === "text";
+  input.type = showing ? "password" : "text";
+  button.textContent = showing ? "Show" : "Hide";
+  button.setAttribute("aria-label", showing ? "Show password" : "Hide password");
+};
 document.querySelector("#loginForm").onsubmit = (event) => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.currentTarget).entries());
@@ -1120,13 +1181,17 @@ document.querySelector("#editorForm").onsubmit = async (event) => {
 document.querySelector("#linkForm").onsubmit = (event) => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.currentTarget).entries());
-  const link = {
+  const existingLink = quickLinks.find(item => String(item.id) === String(editingLinkId));
+  const link = existingLink || {
+    id: `local-${crypto.randomUUID()}`
+  };
+  Object.assign(link, {
     name: data.title.trim(),
     client: data.client,
     notes: data.description.trim(),
     url: data.url.trim()
-  };
-  quickLinks.unshift(link);
+  });
+  if (!existingLink) quickLinks.unshift(link);
   saveQuickLinks();
   closeLinkModal();
   renderAll();
