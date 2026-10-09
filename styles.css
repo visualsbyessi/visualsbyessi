@@ -854,7 +854,7 @@ tr.row-selected {
   font-size: 12px;
 }
 
-.status-Ongoing { background: #e5f4ec; color: #034b2b; }
+.status-Ongoing { background: #e8f2ff; color: #185a9d; }
 .status-For-Checking { background: #fff1c2; color: #986100; }
 .status-Revision,
 .status-For-Revision { background: var(--red-soft); color: var(--red); }
@@ -881,7 +881,7 @@ tr.row-selected {
   font-weight: 800;
 }
 
-.status-ongoing { background: #e5f4ec; color: #034b2b; border-color: #bde3ce; }
+.status-ongoing { background: #e8f2ff; color: #185a9d; border-color: #b9d8ff; }
 .status-for-checking { background: #fff1c2; color: #986100; border-color: #ffe08a; }
 .status-revision,
 .status-for-revision { background: var(--red-soft); color: var(--red); border-color: #ffc0c6; }
