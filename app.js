@@ -319,6 +319,7 @@ let currentUser = null;
 let activeEditor = "Essi";
 let previewEditor = "Essi";
 let workspaceMode = "mine";
+let workspaceStatusFilter = "all";
 let currentView = "dashboard";
 let searchTerm = "";
 let editingEditorName = null;
@@ -659,13 +660,14 @@ function projectTable(rows, opts = {}) {
   `;
 }
 
-function summaryCards(c) {
+function summaryCards(c, activeFilter = "total") {
+  const activeClass = filter => activeFilter === filter ? " active-filter" : "";
   return `
-    <div class="card"><span class="card-icon">${icon("video")}</span><span class="label">Total videos</span><strong>${c.total}</strong><small>All visible projects</small></div>
-    <div class="card"><span class="card-icon amber-icon">${icon("clock")}</span><span class="label">Ongoing</span><strong>${c.ongoing}</strong><small>In progress</small></div>
-    <div class="card"><span class="card-icon gold-icon">${icon("search")}</span><span class="label">For checking</span><strong>${c.checking}</strong><small>Awaiting review</small></div>
-    <div class="card"><span class="card-icon red-icon">${icon("refresh")}</span><span class="label">Revision</span><strong>${c.revision}</strong><small>Needs changes</small></div>
-    <div class="card"><span class="card-icon green-icon">${icon("check")}</span><span class="label">Done</span><strong>${c.done}</strong><small>Done or paid</small></div>
+    <div class="card${activeClass("all")}" data-status-filter="all"><span class="card-icon">${icon("video")}</span><span class="label">Total videos</span><strong>${c.total}</strong><small>All visible projects</small></div>
+    <div class="card${activeClass("ongoing")}" data-status-filter="ongoing"><span class="card-icon amber-icon">${icon("clock")}</span><span class="label">Ongoing</span><strong>${c.ongoing}</strong><small>In progress</small></div>
+    <div class="card${activeClass("checking")}" data-status-filter="checking"><span class="card-icon gold-icon">${icon("search")}</span><span class="label">For checking</span><strong>${c.checking}</strong><small>Awaiting review</small></div>
+    <div class="card${activeClass("revision")}" data-status-filter="revision"><span class="card-icon red-icon">${icon("refresh")}</span><span class="label">Revision</span><strong>${c.revision}</strong><small>Needs changes</small></div>
+    <div class="card${activeClass("done")}" data-status-filter="done"><span class="card-icon green-icon">${icon("check")}</span><span class="label">Done</span><strong>${c.done}</strong><small>Done or paid</small></div>
   `;
 }
 
@@ -771,11 +773,19 @@ function renderClientPage(id, title, rows) {
 function renderWorkspace(editor = activeEditor, target = "#view-workspace") {
   const rows = projects.filter(p => p.editor === editor || (!p.editor && allowedEditors(p.client).includes(editor)));
   const addNicolas = canCreateNicolasProject(editor) && target === "#view-workspace";
-  const visibleRows = workspaceMode === "all" ? rows : workspaceMode === "available" ? rows.filter(p => !p.editor) : rows.filter(p => p.editor === editor);
+  const modeRows = workspaceMode === "all" ? rows : workspaceMode === "available" ? rows.filter(p => !p.editor) : rows.filter(p => p.editor === editor);
+  const visibleRows = modeRows.filter(project => {
+    if (workspaceStatusFilter === "all") return true;
+    if (workspaceStatusFilter === "ongoing") return project.status === "Ongoing";
+    if (workspaceStatusFilter === "checking") return project.status === "For Checking";
+    if (workspaceStatusFilter === "revision") return ["Revision", "For Revision"].includes(project.status);
+    if (workspaceStatusFilter === "done") return ["Done", "Paid"].includes(project.status);
+    return true;
+  });
   const nicolasOnly = visibleRows.length > 0 && visibleRows.every(p => p.client === "Nicolas");
   document.querySelector(target).innerHTML = `
-    <div class="cards workspace-summary">
-      ${summaryCards(counts(rows))}
+    <div class="cards workspace-summary" data-workspace-cards="true">
+      ${summaryCards(counts(modeRows), workspaceStatusFilter)}
       ${earningsCard(editor)}
     </div>
     <div class="panel">
@@ -816,7 +826,7 @@ function renderLinks() {
               </div>
             ` : ""}
             <h3>${link.name}</h3>
-            <p>${link.notes}</p>
+            ${link.notes ? `<p>${link.notes}</p>` : ""}
             <a href="${link.url || "#"}" target="_blank" rel="noopener" class="linkish">${icon("link")} Open link</a>
           </div>
         `).join("") || `<div class="empty-card">No quick links yet.</div>`}
@@ -1068,6 +1078,13 @@ document.addEventListener("click", async (event) => {
   if (mode) {
     workspaceMode = mode;
     renderAll();
+  }
+
+  const filterCard = event.target.closest("[data-status-filter]");
+  if (filterCard) {
+    workspaceStatusFilter = filterCard.dataset.statusFilter;
+    renderAll();
+    setView(currentView);
   }
 
   if (action === "add-nicolas") {
