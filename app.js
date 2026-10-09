@@ -76,6 +76,7 @@ async function loadRemoteData() {
       editor: project.editors?.name || "",
       status: project.status || "",
       deliverable: project.deliverable_link || "",
+      duration: Number(project.duration_minutes || 0),
       paidAt: project.paid_at || ""
     })));
     await cleanupExpiredPaidProjects();
@@ -151,7 +152,8 @@ async function saveProjectRemote(project) {
     status: project.status || "Ongoing",
     script_link: project.scriptLink || null,
     raw_link: project.rawLink || null,
-    deliverable_link: project.deliverable || null
+    deliverable_link: project.deliverable || null,
+    duration_minutes: project.duration || null
   };
   if (remotePaidAtEnabled) payload.paid_at = project.paidAt || null;
   try {
@@ -460,6 +462,29 @@ function canSeeQuickLink(link, user = currentUser) {
   if (client === "Nicolas") return nicolasEditors.includes(user);
   if (client === "Mehdi & Deniss") return mdEditors.includes(user);
   return false;
+}
+
+function formatDuration(minutes = 0) {
+  const totalSeconds = Math.round(Number(minutes || 0) * 60);
+  const wholeMinutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(wholeMinutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function parseDuration(value = "") {
+  const match = String(value).trim().match(/^(\d{1,2}):([0-5]\d)$/);
+  if (!match) return 0;
+  return Number(match[1]) + Number(match[2]) / 60;
+}
+
+function updateDurationField() {
+  const form = document.querySelector("#projectForm");
+  const showDuration = isAdmin() && form.elements.client.value === "Deniss" && form.elements.type.value === "Long Story";
+  const field = document.querySelector("[data-form-field='duration']");
+  field.classList.toggle("hidden", !showDuration);
+  form.elements.duration.required = showDuration;
+  if (showDuration && !form.elements.duration.value) form.elements.duration.value = "02:00";
+  if (!showDuration) form.elements.duration.value = "";
 }
 
 function statusPill(status) {
@@ -891,6 +916,7 @@ function configureProjectForm(clientPreset = "") {
     editorSelect.value = editingProject.editor || "Unassigned";
     form.elements.script.value = editingProject.scriptLink || "";
     form.elements.raw.value = editingProject.rawLink || "";
+    form.elements.duration.value = editingProject.duration ? formatDuration(editingProject.duration) : "";
   } else if (clientPreset) {
     clientSelect.value = clientPreset;
   }
@@ -911,9 +937,11 @@ function configureProjectForm(clientPreset = "") {
     const shouldHide =
       (name === "client" && (isNicolasProject || !isAdmin())) ||
       (isNicolasProject && ["script", "raw"].includes(name)) ||
+      (name === "duration" && !(isAdmin() && clientSelect.value === "Deniss" && typeSelect.value === "Long Story")) ||
       (editorLockedToCurrentUser && name === "editor");
     field.classList.toggle("hidden", shouldHide);
   });
+  updateDurationField();
 }
 
 function openModal(clientPreset = "") {
@@ -1142,6 +1170,7 @@ document.querySelector("#loginForm").onsubmit = (event) => {
   applySession(matchedUser);
 };
 document.querySelector("#projectForm").elements.client.onchange = () => configureProjectForm(document.querySelector("#projectForm").elements.client.value);
+document.querySelector("#projectForm").elements.type.onchange = updateDurationField;
 document.querySelector("#editorForm").onsubmit = async (event) => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.currentTarget).entries());
@@ -1218,6 +1247,7 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
     raw: !isAdmin() || isNicolasProject ? false : Boolean(data.raw),
     scriptLink: !isAdmin() || isNicolasProject ? "" : data.script,
     rawLink: !isAdmin() || isNicolasProject ? "" : data.raw,
+    duration: selectedClient === "Deniss" && data.type === "Long Story" ? parseDuration(data.duration) : 0,
     editor: !isAdmin() ? currentUser : data.editor === "Unassigned" ? "" : data.editor
   });
   if (!existingProject) projects.unshift(project);
