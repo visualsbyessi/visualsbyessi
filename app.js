@@ -328,6 +328,7 @@ let searchTerm = "";
 let editingEditorName = null;
 let editingProjectId = null;
 let editingLinkId = null;
+let draggingQuickLinkGroup = "";
 const selectedProjectIds = new Set();
 let nextId = 15;
 const defaultNavOrder = ["dashboard", "md", "nicolas", "editors", "workspace", "links", "viewas"];
@@ -515,6 +516,53 @@ function initNavDrag() {
     });
     if (afterElement) nav.insertBefore(dragging, afterElement);
     else nav.appendChild(dragging);
+  });
+}
+
+function saveQuickLinkOrderFromDom() {
+  const orderedIds = [...new Set([...document.querySelectorAll(".quick-link[data-link-id]")]
+    .map(card => String(card.dataset.linkId)))];
+  if (!orderedIds.length) return;
+  const orderedLinks = orderedIds
+    .map(id => quickLinks.find(link => String(link.id) === id))
+    .filter(Boolean);
+  const remainingLinks = quickLinks.filter(link => !orderedIds.includes(String(link.id)));
+  quickLinks.splice(0, quickLinks.length, ...orderedLinks, ...remainingLinks);
+  saveQuickLinks();
+}
+
+function initQuickLinkDrag() {
+  if (!isAdmin()) return;
+  document.querySelectorAll(".quick-link[data-link-id]").forEach(card => {
+    card.draggable = true;
+    card.addEventListener("dragstart", event => {
+      if (event.target.closest("button, a")) {
+        event.preventDefault();
+        return;
+      }
+      const group = card.closest(".quick-links");
+      draggingQuickLinkGroup = group?.dataset.linkGroup || "";
+      event.dataTransfer.setData("text/plain", card.dataset.linkId);
+      card.classList.add("dragging");
+    });
+    card.addEventListener("dragend", () => {
+      card.classList.remove("dragging");
+      draggingQuickLinkGroup = "";
+      saveQuickLinkOrderFromDom();
+    });
+  });
+  document.querySelectorAll(".quick-links[data-link-group]").forEach(group => {
+    group.addEventListener("dragover", event => {
+      event.preventDefault();
+      const dragging = document.querySelector(".quick-link.dragging");
+      if (!dragging || draggingQuickLinkGroup !== group.dataset.linkGroup) return;
+      const afterElement = [...group.querySelectorAll(".quick-link:not(.dragging)")].find(card => {
+        const box = card.getBoundingClientRect();
+        return event.clientY < box.top + box.height / 2;
+      });
+      if (afterElement) group.insertBefore(dragging, afterElement);
+      else group.appendChild(dragging);
+    });
   });
 }
 
@@ -832,7 +880,7 @@ function renderLinks() {
     }))
     .filter(group => group.links.length || isAdmin());
   const renderLinkCard = link => `
-    <div class="card quick-link">
+    <div class="card quick-link" data-link-id="${link.id}">
       ${isAdmin() ? `
         <div class="quick-link-actions">
           <button class="icon-action light-icon" data-action="edit-link" data-id="${link.id}" title="Edit">${icon("pen")}</button>
@@ -857,7 +905,7 @@ function renderLinks() {
               <h3>${group.client}</h3>
               <span>${group.links.length} link${group.links.length === 1 ? "" : "s"}</span>
             </div>
-            <div class="grid quick-links">
+            <div class="grid quick-links" data-link-group="${group.client}">
               ${group.links.map(renderLinkCard).join("") || `<div class="empty-card">No links yet.</div>`}
             </div>
           </section>
@@ -865,6 +913,7 @@ function renderLinks() {
       </div>
     </div>
   `;
+  initQuickLinkDrag();
 }
 
 function renderEditors() {
