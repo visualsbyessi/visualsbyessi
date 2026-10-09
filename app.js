@@ -902,13 +902,11 @@ function updateTopbar(view) {
   const topEarningsBox = document.querySelector("#topEarnings");
   const search = document.querySelector("#search");
   const addProjectButton = document.querySelector("#addProjectButton");
-  const eyebrow = document.querySelector(".eyebrow");
   const showWorkspaceEarnings = view === "workspace";
   topEarningsBox.classList.add("hidden");
   search.classList.toggle("hidden", showWorkspaceEarnings);
   if (!showWorkspaceEarnings) search.value = searchTerm;
   addProjectButton.classList.add("hidden");
-  eyebrow.classList.toggle("hidden", showWorkspaceEarnings);
 }
 
 function applySession(user) {
