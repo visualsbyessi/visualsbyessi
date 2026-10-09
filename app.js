@@ -367,6 +367,7 @@ function discordProjectContent(action, project, actor = currentUser || "Essi", p
 
   if (action === "take") return `🎬 ${actor} took a project.\n${details}${otherEditors ? `\n\n${otherEditors}` : ""}`;
   if (action === "release") return `↩️ ${actor} released a project.\n${details}${otherEditors ? `\n\n${otherEditors}` : ""}`;
+  if (action === "assigned") return `📌 ${actor} assigned a project${assignedMention ? ` to ${assignedMention}` : ""}.\n${details}`;
   if (action === "add_nicolas") return `➕ ${actor} added a Nicolas project.\n${details}${otherEditors ? `\n\n${otherEditors}` : ""}`;
   if (action === "ongoing") return `▶️ ${actor} started working on a project.\n${details}`;
   if (action === "checking") return `🔎 Project is ready for checking.${adminMention ? ` ${adminMention}` : ""}\n${details}`;
@@ -1516,6 +1517,7 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
   if (isNicolasProject && !["Easy", "Hard"].includes(data.type)) return;
   if (!isNicolasProject && ["Easy", "Hard"].includes(data.type)) return;
   const existingProject = projects.find(item => String(item.id) === String(editingProjectId));
+  const previousEditor = existingProject?.editor || "";
   const project = existingProject || {
     id: nextId++,
     status: !isAdmin() ? "Ongoing" : data.editor === "Unassigned" ? "" : "Ongoing",
@@ -1541,6 +1543,9 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
   saveProjectRemote(project).then(() => {
     if (!existingProject && selectedClient === "Nicolas" && !isAdmin()) {
       sendDiscordUpdate("add_nicolas", project, currentUser || project.editor || "Essi");
+    }
+    if (isAdmin() && project.editor && previousEditor !== project.editor) {
+      sendDiscordUpdate("assigned", project, currentUser || "Essi", previousEditor);
     }
     renderAll();
     setView(currentView);
