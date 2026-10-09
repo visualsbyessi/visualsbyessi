@@ -490,6 +490,16 @@ body.night-mode .theme-toggle-knob::before {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.cards:has(> .card:nth-child(6)) {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cards:has(> .card:nth-child(6)) .card {
+  min-height: 118px;
+  padding: 16px;
+}
+
 .workspace-summary {
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
@@ -948,6 +958,7 @@ tr.row-selected {
   font-size: 12px;
 }
 
+.status-To-Do { background: #edf2f7; color: #344054; }
 .status-Ongoing { background: #e8f2ff; color: #185a9d; }
 .status-For-Checking { background: #fff1c2; color: #986100; }
 .status-Revision,
@@ -975,6 +986,7 @@ tr.row-selected {
   font-weight: 800;
 }
 
+.status-to-do { background: #edf2f7; color: #344054; border-color: #cfd8e3; }
 .status-ongoing { background: #e8f2ff; color: #185a9d; border-color: #b9d8ff; }
 .status-for-checking { background: #fff1c2; color: #986100; border-color: #ffe08a; }
 .status-revision,

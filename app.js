@@ -92,7 +92,7 @@ async function loadRemoteData() {
       scriptLink: project.script_link || "",
       rawLink: project.raw_link || "",
       editor: project.editors?.name || "",
-      status: project.status || "",
+      status: project.status || "To Do",
       deliverable: project.deliverable_link || "",
       duration: Number(project.duration_minutes || 0),
       paidAt: project.paid_at || ""
@@ -386,6 +386,7 @@ function discordProjectContent(action, project, actor = currentUser || "Essi", p
   if (action === "release") return `↩️ ${actor} released a project.\n${details}${otherEditors ? `\n\n${otherEditors}` : ""}`;
   if (action === "assigned") return `📌 ${actor} assigned a project${assignedMention ? ` to ${assignedMention}` : ""}.\n${details}`;
   if (action === "add_nicolas") return `➕ ${actor} added a Nicolas project.\n${details}${otherEditors ? `\n\n${otherEditors}` : ""}`;
+  if (action === "todo") return `📝 Project is now to do.\n${details}`;
   if (action === "ongoing") return `▶️ ${actor} started working on a project.\n${details}`;
   if (action === "checking") return `🔎 Project is ready for checking.${adminMention ? ` ${adminMention}` : ""}\n${details}`;
   if (action === "revision") return `🔁 Project needs revision.${assignedMention ? ` ${assignedMention}` : ""}\n${details}`;
@@ -476,7 +477,7 @@ const quickLinks = [
   { id: "sample-6", name: "Rate Sheet", client: "Private", notes: "Rates and payouts", url: "#" }
 ];
 
-const statusOptions = ["Ongoing", "For Checking", "Revision", "Done", "Paid"];
+const statusOptions = ["To Do", "Ongoing", "For Checking", "Revision", "Done", "Paid"];
 const iconPaths = {
   video: "M15 10l4.5-2.5v9L15 14M4 6h11v12H4z",
   clock: "M12 6v6l4 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
@@ -559,6 +560,7 @@ function invoiceAmount(project) {
 function counts(rows) {
   return {
     total: rows.length,
+    todo: rows.filter(p => p.status === "To Do" || !p.status).length,
     ongoing: rows.filter(p => p.status === "Ongoing").length,
     checking: rows.filter(p => p.status === "For Checking").length,
     revision: rows.filter(p => ["Revision", "For Revision"].includes(p.status)).length,
@@ -836,6 +838,7 @@ function summaryCards(c, activeFilter = "total") {
   const activeClass = filter => activeFilter === filter ? " active-filter" : "";
   return `
     <div class="card${activeClass("all")}" data-status-filter="all"><span class="card-icon">${icon("video")}</span><span class="label">Total videos</span><strong>${c.total}</strong><small>All visible projects</small></div>
+    <div class="card${activeClass("todo")}" data-status-filter="todo"><span class="card-icon">${icon("file")}</span><span class="label">To do</span><strong>${c.todo}</strong><small>Ready to start</small></div>
     <div class="card${activeClass("ongoing")}" data-status-filter="ongoing"><span class="card-icon amber-icon">${icon("clock")}</span><span class="label">Ongoing</span><strong>${c.ongoing}</strong><small>In progress</small></div>
     <div class="card${activeClass("checking")}" data-status-filter="checking"><span class="card-icon gold-icon">${icon("search")}</span><span class="label">For checking</span><strong>${c.checking}</strong><small>Awaiting review</small></div>
     <div class="card${activeClass("revision")}" data-status-filter="revision"><span class="card-icon red-icon">${icon("refresh")}</span><span class="label">Revision</span><strong>${c.revision}</strong><small>Needs changes</small></div>
@@ -846,6 +849,7 @@ function summaryCards(c, activeFilter = "total") {
 function filterRowsByStatus(rows, filter) {
   return rows.filter(project => {
     if (filter === "all") return true;
+    if (filter === "todo") return project.status === "To Do" || !project.status;
     if (filter === "ongoing") return project.status === "Ongoing";
     if (filter === "checking") return project.status === "For Checking";
     if (filter === "revision") return ["Revision", "For Revision"].includes(project.status);
@@ -1268,7 +1272,7 @@ document.addEventListener("click", async (event) => {
     const actor = activeEditor || currentUser || "Essi";
     if (action === "take") {
       p.editor = actor;
-      p.status = "Ongoing";
+      p.status = "To Do";
     }
     if (action === "release") {
       p.editor = "";
@@ -1411,6 +1415,7 @@ document.addEventListener("change", async (event) => {
       await saveProjectRemote(p);
       if (previousStatus !== p.status) {
         const statusAction = ({
+          "To Do": "todo",
           "Ongoing": "ongoing",
           "For Checking": "checking",
           "For Revision": "revision",
@@ -1537,7 +1542,7 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
   const previousEditor = existingProject?.editor || "";
   const project = existingProject || {
     id: nextId++,
-    status: !isAdmin() ? "Ongoing" : data.editor === "Unassigned" ? "" : "Ongoing",
+    status: "To Do",
     deliverable: "",
     paidAt: ""
   };
