@@ -2,13 +2,13 @@ const editors = ["Essi", "Aimae", "Thea", "Siren", "David", "Mc", "Drix"];
 const nicolasEditors = ["Essi", "Siren", "David", "Mc", "Drix"];
 const mdEditors = ["Essi", "Aimae", "Thea"];
 const users = {
-  Essi: { role: "Editor", username: "Visualsbyessi", password: "Cielo122900!", access: "all" },
-  Aimae: { role: "Editor", username: "aimae", password: "demo", access: "md" },
-  Thea: { role: "Editor", username: "thea", password: "demo", access: "md" },
-  Siren: { role: "Editor", username: "siren", password: "demo", access: "nicolas" },
-  David: { role: "Editor", username: "david", password: "demo", access: "nicolas" },
-  Mc: { role: "Editor", username: "mc", password: "demo", access: "nicolas" },
-  Drix: { role: "Editor", username: "drix", password: "demo", access: "nicolas" }
+  Essi: { role: "Editor", username: "Visualsbyessi", password: "Cielo122900!", access: "all", discordId: "" },
+  Aimae: { role: "Editor", username: "aimae", password: "demo", access: "md", discordId: "" },
+  Thea: { role: "Editor", username: "thea", password: "demo", access: "md", discordId: "" },
+  Siren: { role: "Editor", username: "siren", password: "demo", access: "nicolas", discordId: "" },
+  David: { role: "Editor", username: "david", password: "demo", access: "nicolas", discordId: "" },
+  Mc: { role: "Editor", username: "mc", password: "demo", access: "nicolas", discordId: "" },
+  Drix: { role: "Editor", username: "drix", password: "demo", access: "nicolas", discordId: "" }
 };
 
 const SUPABASE_URL = "https://hbyvddtczxjmjiommlcg.supabase.co";
@@ -57,7 +57,8 @@ async function loadRemoteData() {
           role: "Editor",
           username: editor.username,
           password: editor.password || "",
-          access: editor.access
+          access: editor.access,
+          discordId: editor.discord_id || editor.discordId || ""
         };
       });
       rebuildAccessLists();
@@ -108,7 +109,8 @@ async function saveEditorRemote(name) {
     name,
     username: user.username,
     password: user.password,
-    access: user.access
+    access: user.access,
+    discord_id: user.discordId || ""
   };
   try {
     if (user.id) {
@@ -313,6 +315,23 @@ function loadQuickLinks() {
   } catch (error) {
     console.warn("Could not load saved quick links.", error);
   }
+}
+
+function discordMention(name) {
+  const id = users[name]?.discordId || "";
+  return id ? `<@${id}>` : name;
+}
+
+function editorsForProjectClient(client) {
+  if (client === "Nicolas") return nicolasEditors;
+  if (client === "Mehdi" || client === "Deniss") return mdEditors;
+  return editors;
+}
+
+function discordMentionsForClient(client, exceptName = "") {
+  return editorsForProjectClient(client)
+    .filter(name => name !== exceptName && users[name]?.discordId)
+    .map(name => discordMention(name));
 }
 
 loadEditorState();
@@ -924,12 +943,12 @@ function renderEditors() {
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Name</th><th>Username</th><th>Access</th><th>Password</th><th>Action</th></tr></thead>
+          <thead><tr><th>Name</th><th>Username</th><th>Access</th><th>Discord ID</th><th>Password</th><th>Action</th></tr></thead>
           <tbody>
             ${editors.map(name => {
               const user = users[name] || {};
               const deleteButton = name === "Essi" ? `<button class="ghost-button" disabled>${icon("lock")} Locked</button>` : `<button class="danger-button" data-action="delete-editor" data-editor="${name}">${icon("release")} Delete</button>`;
-              return `<tr><td><strong>${name}</strong></td><td>${user.username || name.toLowerCase()}</td><td>${accessLabel(user.access || "nicolas")}</td><td>${user.password || "demo"}</td><td class="row-actions"><button class="ghost-button" data-action="edit-editor" data-editor="${name}">${icon("file")} Edit</button>${deleteButton}</td></tr>`;
+              return `<tr><td><strong>${name}</strong></td><td>${user.username || name.toLowerCase()}</td><td>${accessLabel(user.access || "nicolas")}</td><td>${user.discordId || "Not set"}</td><td>${user.password || "demo"}</td><td class="row-actions"><button class="ghost-button" data-action="edit-editor" data-editor="${name}">${icon("file")} Edit</button>${deleteButton}</td></tr>`;
             }).join("")}
           </tbody>
         </table>
@@ -1099,6 +1118,7 @@ function openEditorModal(name = "") {
     form.elements.name.value = editingEditorName;
     form.elements.username.value = user.username || editingEditorName.toLowerCase();
     form.elements.password.value = user.password || "";
+    form.elements.discordId.value = user.discordId || "";
     form.elements.access.value = user.access || "nicolas";
   } else {
     form.reset();
@@ -1352,7 +1372,8 @@ document.querySelector("#editorForm").onsubmit = async (event) => {
     role: "Editor",
     username: data.username.trim() || name.toLowerCase(),
     password: data.password,
-    access: data.access
+    access: data.access,
+    discordId: data.discordId.trim()
   };
   addEditorAccess(name, data.access);
   saveEditorState();
