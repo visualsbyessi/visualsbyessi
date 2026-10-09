@@ -831,7 +831,7 @@ function renderEditors() {
     <div class="panel">
       <div class="panel-header">
         <div><h2>Editors</h2></div>
-        <button class="primary-button" id="openEditorModal">${icon("plus")} Add Editor</button>
+        <button class="primary-button" data-action="add-editor">${icon("plus")} Add Editor</button>
       </div>
       <div class="table-wrap">
         <table>
@@ -847,7 +847,6 @@ function renderEditors() {
       </div>
     </div>
   `;
-  document.querySelector("#openEditorModal").onclick = openEditorModal;
 }
 
 function refreshEditorOptions() {
@@ -905,11 +904,10 @@ function updateTopbar(view) {
   const addProjectButton = document.querySelector("#addProjectButton");
   const eyebrow = document.querySelector(".eyebrow");
   const showWorkspaceEarnings = view === "workspace";
-  const hideProjectButton = showWorkspaceEarnings || view === "links";
   topEarningsBox.classList.add("hidden");
   search.classList.toggle("hidden", showWorkspaceEarnings);
   if (!showWorkspaceEarnings) search.value = searchTerm;
-  addProjectButton.classList.toggle("hidden", hideProjectButton);
+  addProjectButton.classList.add("hidden");
   eyebrow.classList.toggle("hidden", showWorkspaceEarnings);
 }
 
@@ -924,7 +922,7 @@ function applySession(user) {
   document.querySelector("#signedInName").textContent = user;
   document.querySelector("#signedInRole").textContent = users[user].role;
   document.querySelectorAll(".admin-only").forEach(item => item.classList.toggle("hidden", !isAdmin()));
-  document.querySelector("#addProjectButton").classList.toggle("hidden", !isAdmin());
+  document.querySelector("#addProjectButton").classList.add("hidden");
   renderAll();
   setView(isAdmin() ? "dashboard" : "workspace");
 }
@@ -1083,6 +1081,10 @@ document.addEventListener("click", async (event) => {
     openLinkModal();
   }
 
+  if (action === "add-editor") {
+    openEditorModal();
+  }
+
   if (action === "edit-link") {
     openLinkModal(actionButtonEl.dataset.id);
   }
@@ -1238,6 +1240,8 @@ document.querySelector("#editorForm").onsubmit = async (event) => {
     removeEditorAccess(oldName);
   } else if (oldName) {
     removeEditorAccess(oldName);
+  } else if (!editors.includes(name)) {
+    editors.push(name);
   }
   users[name] = {
     id: oldName && users[oldName]?.id ? users[oldName].id : users[name]?.id,
@@ -1247,13 +1251,17 @@ document.querySelector("#editorForm").onsubmit = async (event) => {
     access: data.access
   };
   addEditorAccess(name, data.access);
-  await saveEditorRemote(name);
   saveEditorState();
   refreshEditorOptions();
   closeEditorModal();
   event.currentTarget.reset();
   renderAll();
   setView("editors");
+  saveEditorRemote(name).then(() => {
+    saveEditorState();
+    renderAll();
+    setView("editors");
+  });
 };
 document.querySelector("#linkForm").onsubmit = (event) => {
   event.preventDefault();
