@@ -1016,21 +1016,29 @@ tr.row-selected {
 
 .quick-link-actions {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 10px;
+  right: 10px;
   display: flex;
-  gap: 6px;
+  gap: 8px;
+  z-index: 3;
 }
 
 .quick-link-actions + h3 {
-  padding-right: 82px;
+  padding-right: 104px;
 }
 
 .light-icon {
-  width: 30px;
-  height: 30px;
+  width: 42px;
+  height: 42px;
   color: #fff;
   background: rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  touch-action: manipulation;
+}
+
+.light-icon .ui-icon {
+  width: 19px;
+  height: 19px;
 }
 
 .light-icon:hover {

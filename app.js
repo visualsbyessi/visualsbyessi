@@ -231,11 +231,13 @@ async function saveQuickLinkRemote(link) {
 }
 
 async function deleteQuickLinkRemote(link) {
-  if (!remoteEnabled || !(typeof link.id === "string" && link.id.length > 20)) return;
-  if (String(link.id).startsWith("sample-") || String(link.id).startsWith("local-")) return;
+  const id = String(link.id || "");
+  const hasRemoteId = remoteEnabled && id.length > 20 && !id.startsWith("sample-") && !id.startsWith("local-");
+  if (!hasRemoteId) return;
   try {
-    await supabaseRequest(`/quick_links?id=eq.${link.id}`, { method: "DELETE" });
+    await supabaseRequest(`/quick_links?id=eq.${id}`, { method: "DELETE" });
   } catch (error) {
+    alert("Could not delete quick link from Supabase. Please run the quick_links SQL permissions again.");
     console.error(error);
   }
 }
@@ -1113,10 +1115,14 @@ document.addEventListener("click", async (event) => {
   }
 
   if (action === "edit-link") {
+    event.preventDefault();
+    event.stopPropagation();
     openLinkModal(actionButtonEl.dataset.id);
   }
 
   if (action === "delete-link") {
+    event.preventDefault();
+    event.stopPropagation();
     const link = quickLinks.find(item => String(item.id) === actionButtonEl.dataset.id);
     if (!link) return;
     if (!confirm(`Delete ${link.name}?`)) return;
