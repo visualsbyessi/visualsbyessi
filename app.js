@@ -17,6 +17,7 @@ const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
 const DISCORD_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/discord-notify`;
 let remoteEnabled = true;
 let remotePaidAtEnabled = true;
+let liveSyncRunning = false;
 const PAID_DELETE_AFTER_DAYS = 7;
 
 async function supabaseRequest(path, options = {}) {
@@ -111,6 +112,22 @@ async function loadRemoteData() {
   } catch (error) {
     remoteEnabled = false;
     console.warn("Using local data because Supabase is not ready.", error);
+  }
+}
+
+function formIsOpen() {
+  return Boolean(document.querySelector(".modal.open"));
+}
+
+async function liveSyncRemoteData() {
+  if (!remoteEnabled || liveSyncRunning || formIsOpen() || !currentUser) return;
+  liveSyncRunning = true;
+  try {
+    await loadRemoteData();
+    renderAll();
+    setView(currentView);
+  } finally {
+    liveSyncRunning = false;
   }
 }
 
@@ -459,7 +476,7 @@ const quickLinks = [
   { id: "sample-6", name: "Rate Sheet", client: "Private", notes: "Rates and payouts", url: "#" }
 ];
 
-const statusOptions = ["Ongoing", "For Checking", "Revision", "For Revision", "Done", "Paid"];
+const statusOptions = ["Ongoing", "For Checking", "Revision", "Done", "Paid"];
 const iconPaths = {
   video: "M15 10l4.5-2.5v9L15 14M4 6h11v12H4z",
   clock: "M12 6v6l4 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
@@ -1536,17 +1553,19 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
     editor: !isAdmin() ? currentUser : data.editor === "Unassigned" ? "" : data.editor
   });
   if (!existingProject) projects.unshift(project);
+  const shouldNotifyAssigned = isAdmin() && project.editor && previousEditor !== project.editor;
+  const shouldNotifyAddedNicolas = !existingProject && selectedClient === "Nicolas" && !isAdmin();
   event.currentTarget.reset();
   closeModal();
   renderAll();
   setView(currentView);
+  if (shouldNotifyAssigned) {
+    sendDiscordUpdate("assigned", project, currentUser || "Essi", previousEditor);
+  }
+  if (shouldNotifyAddedNicolas) {
+    sendDiscordUpdate("add_nicolas", project, currentUser || project.editor || "Essi");
+  }
   saveProjectRemote(project).then(() => {
-    if (!existingProject && selectedClient === "Nicolas" && !isAdmin()) {
-      sendDiscordUpdate("add_nicolas", project, currentUser || project.editor || "Essi");
-    }
-    if (isAdmin() && project.editor && previousEditor !== project.editor) {
-      sendDiscordUpdate("assigned", project, currentUser || "Essi", previousEditor);
-    }
     renderAll();
     setView(currentView);
   });
@@ -1566,3 +1585,5 @@ loadRemoteData().then(() => {
     if (currentUser) setView(currentView);
   }
 });
+
+setInterval(liveSyncRemoteData, 5000);
