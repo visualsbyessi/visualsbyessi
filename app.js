@@ -334,6 +334,16 @@ function discordMentionsForClient(client, exceptName = "") {
     .map(name => discordMention(name));
 }
 
+function applyTheme(theme = currentTheme) {
+  currentTheme = theme === "night" ? "night" : "day";
+  document.body.classList.toggle("night-mode", currentTheme === "night");
+  const label = document.querySelector("#themeToggleText");
+  const button = document.querySelector("#themeToggle");
+  if (label) label.textContent = currentTheme === "night" ? "Night" : "Day";
+  if (button) button.setAttribute("aria-label", `Switch to ${currentTheme === "night" ? "day" : "night"} mode`);
+  localStorage.setItem("visualsByEssiTheme", currentTheme);
+}
+
 loadEditorState();
 
 let currentUser = null;
@@ -351,6 +361,7 @@ let draggingQuickLinkGroup = "";
 const selectedProjectIds = new Set();
 let nextId = 15;
 const defaultNavOrder = ["dashboard", "md", "nicolas", "editors", "workspace", "links", "viewas"];
+let currentTheme = localStorage.getItem("visualsByEssiTheme") || "day";
 
 const projects = [
   { id: 1, client: "Deniss", project: "Shorts Batch 41", type: "Regular Edit", script: true, raw: true, editor: "Aimae", status: "Ongoing", deliverable: "" },
@@ -1331,6 +1342,7 @@ document.querySelector("#cancelEditorModal").onclick = closeEditorModal;
 document.querySelector("#closeLinkModal").onclick = closeLinkModal;
 document.querySelector("#cancelLinkModal").onclick = closeLinkModal;
 document.querySelector("#logoutButton").onclick = endSession;
+document.querySelector("#themeToggle").onclick = () => applyTheme(currentTheme === "night" ? "day" : "night");
 document.querySelector("#toggleLoginPassword").onclick = () => {
   const input = document.querySelector("#loginPassword");
   const checkbox = document.querySelector("#toggleLoginPassword");
@@ -1446,6 +1458,7 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
 };
 
 loadQuickLinks();
+applyTheme();
 applyNavOrder();
 initNavDrag();
 
