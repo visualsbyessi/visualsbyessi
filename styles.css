@@ -1005,6 +1005,38 @@ tr.row-selected {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.quick-link-groups {
+  display: grid;
+  gap: 18px;
+}
+
+.link-client-card {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(3, 75, 43, 0.08);
+  padding: 16px;
+}
+
+.link-client-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.link-client-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.link-client-header span {
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
 .quick-link {
   position: relative;
   padding: 18px;

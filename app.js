@@ -350,10 +350,10 @@ const projects = [
 ];
 
 const quickLinks = [
-  { id: "sample-1", name: "Main Upload Folder", client: "All", notes: "Final exports and handoff files", url: "#" },
-  { id: "sample-2", name: "Editing Guidelines", client: "All", notes: "General editing standards", url: "#" },
-  { id: "sample-3", name: "Caption Style Guide", client: "All", notes: "Caption format and styling", url: "#" },
-  { id: "sample-4", name: "Deniss Script Folder", client: "Mehdi & Deniss", notes: "Scripts for Deniss work", url: "#" },
+  { id: "sample-1", name: "Main Upload Folder", client: "Nicolas", notes: "Final exports and handoff files", url: "#" },
+  { id: "sample-2", name: "Editing Guidelines", client: "Nicolas", notes: "General editing standards", url: "#" },
+  { id: "sample-3", name: "Caption Style Guide", client: "Mehdi", notes: "Caption format and styling", url: "#" },
+  { id: "sample-4", name: "Deniss Script Folder", client: "Deniss", notes: "Scripts for Deniss work", url: "#" },
   { id: "sample-5", name: "Nicolas References", client: "Nicolas", notes: "Sample edits and references", url: "#" },
   { id: "sample-6", name: "Rate Sheet", client: "Private", notes: "Rates and payouts", url: "#" }
 ];
@@ -464,7 +464,7 @@ function canSeeQuickLink(link, user = currentUser) {
   if (client === "All") return true;
   if (client === "Private") return false;
   if (client === "Nicolas") return nicolasEditors.includes(user);
-  if (client === "Mehdi & Deniss") return mdEditors.includes(user);
+  if (["Mehdi", "Deniss", "Mehdi & Deniss"].includes(client)) return mdEditors.includes(user);
   return false;
 }
 
@@ -820,26 +820,48 @@ function renderWorkspace(editor = activeEditor, target = "#view-workspace") {
 
 function renderLinks() {
   const visibleLinks = quickLinks.filter(link => canSeeQuickLink(link));
+  const groups = ["Mehdi", "Deniss", "Nicolas", "Private"]
+    .map(client => ({
+      client,
+      links: visibleLinks.filter(link => {
+        const linkClient = link.client || "All";
+        if (client === "Mehdi") return linkClient === "Mehdi" || linkClient === "Mehdi & Deniss";
+        if (client === "Deniss") return linkClient === "Deniss" || linkClient === "Mehdi & Deniss";
+        return linkClient === client;
+      })
+    }))
+    .filter(group => group.links.length || isAdmin());
+  const renderLinkCard = link => `
+    <div class="card quick-link">
+      ${isAdmin() ? `
+        <div class="quick-link-actions">
+          <button class="icon-action light-icon" data-action="edit-link" data-id="${link.id}" title="Edit">${icon("pen")}</button>
+          <button class="icon-action light-icon danger-light" data-action="delete-link" data-id="${link.id}" title="Delete">${icon("trash")}</button>
+        </div>
+      ` : ""}
+      <h3>${link.name}</h3>
+      ${link.notes ? `<p>${link.notes}</p>` : ""}
+      <a href="${link.url || "#"}" target="_blank" rel="noopener" class="linkish">${icon("link")} Open link</a>
+    </div>
+  `;
   document.querySelector("#view-links").innerHTML = `
     <div class="panel">
       <div class="panel-header">
         <div><h2>Quick Links</h2></div>
         ${isAdmin() ? `<button class="primary-button" data-action="add-link">${icon("plus")} Add Link</button>` : ""}
       </div>
-      <div class="grid quick-links">
-        ${visibleLinks.map(link => `
-          <div class="card quick-link">
-            ${isAdmin() ? `
-              <div class="quick-link-actions">
-                <button class="icon-action light-icon" data-action="edit-link" data-id="${link.id}" title="Edit">${icon("pen")}</button>
-                <button class="icon-action light-icon danger-light" data-action="delete-link" data-id="${link.id}" title="Delete">${icon("trash")}</button>
-              </div>
-            ` : ""}
-            <h3>${link.name}</h3>
-            ${link.notes ? `<p>${link.notes}</p>` : ""}
-            <a href="${link.url || "#"}" target="_blank" rel="noopener" class="linkish">${icon("link")} Open link</a>
-          </div>
-        `).join("") || `<div class="empty-card">No quick links yet.</div>`}
+      <div class="quick-link-groups">
+        ${groups.length ? groups.map(group => `
+          <section class="link-client-card">
+            <div class="link-client-header">
+              <h3>${group.client}</h3>
+              <span>${group.links.length} link${group.links.length === 1 ? "" : "s"}</span>
+            </div>
+            <div class="grid quick-links">
+              ${group.links.map(renderLinkCard).join("") || `<div class="empty-card">No links yet.</div>`}
+            </div>
+          </section>
+        `).join("") : `<div class="empty-card">No quick links yet.</div>`}
       </div>
     </div>
   `;
@@ -1045,13 +1067,14 @@ function openLinkModal(linkId = "") {
   editingLinkId = linkId || null;
   const form = document.querySelector("#linkForm");
   const link = quickLinks.find(item => String(item.id) === String(editingLinkId));
+  const validLinkClients = ["Mehdi", "Deniss", "Nicolas", "Private"];
   form.reset();
   document.querySelector("#linkModalTitle").textContent = link ? "Edit Link" : "Add Link";
   document.querySelector("#linkSubmitButton").textContent = link ? "Save Link" : "Add Link";
   if (link) {
     form.elements.title.value = link.name || "";
     form.elements.description.value = link.notes || "";
-    form.elements.client.value = link.client || "All";
+    form.elements.client.value = validLinkClients.includes(link.client) ? link.client : "Mehdi";
     form.elements.url.value = link.url || "";
   }
   document.querySelector("#linkModal").classList.add("open");
