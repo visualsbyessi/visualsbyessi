@@ -385,6 +385,7 @@ function discordProjectContent(action, project, actor = currentUser || "Essi", p
   if (action === "take") return `🎬 ${actor} took a project.\n${details}${otherEditors ? `\n\n${otherEditors}` : ""}`;
   if (action === "release") return `↩️ ${actor} released a project.\n${details}${otherEditors ? `\n\n${otherEditors}` : ""}`;
   if (action === "assigned") return `📌 ${actor} assigned a project${assignedMention ? ` to ${assignedMention}` : ""}.\n${details}`;
+  if (action === "unassigned_added") return `🆕 ${actor} added a new unassigned project.\n${details}${otherEditors ? `\n\n${otherEditors}` : ""}`;
   if (action === "add_nicolas") return `➕ ${actor} added a Nicolas project.\n${details}${otherEditors ? `\n\n${otherEditors}` : ""}`;
   if (action === "todo") return `📝 Project is now to do.\n${details}`;
   if (action === "ongoing") return `▶️ ${actor} started working on a project.\n${details}`;
@@ -1560,6 +1561,7 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
   if (!existingProject) projects.unshift(project);
   const shouldNotifyAssigned = isAdmin() && project.editor && previousEditor !== project.editor;
   const shouldNotifyAddedNicolas = !existingProject && selectedClient === "Nicolas" && !isAdmin();
+  const shouldNotifyUnassignedAdded = isAdmin() && !existingProject && !project.editor;
   event.currentTarget.reset();
   closeModal();
   renderAll();
@@ -1569,6 +1571,9 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
   }
   if (shouldNotifyAddedNicolas) {
     sendDiscordUpdate("add_nicolas", project, currentUser || project.editor || "Essi");
+  }
+  if (shouldNotifyUnassignedAdded) {
+    sendDiscordUpdate("unassigned_added", project, currentUser || "Essi");
   }
   saveProjectRemote(project).then(() => {
     renderAll();
