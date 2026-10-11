@@ -1121,7 +1121,7 @@ function renderClientPage(id, title, rows) {
     <div class="panel">
       <div class="panel-header">
         <div><h2>${title}</h2></div>
-        ${canAdd ? `<button class="primary-button inline-add" data-client="${isNicolasPage ? "Nicolas" : ""}">${icon("plus")} Add Project</button>` : ""}
+        ${canAdd ? `<button class="primary-button inline-add" data-client="${isNicolasPage ? "Nicolas" : "Mehdi"}">${icon("plus")} ${isNicolasPage ? "Add Nicolas Project" : "Add Mehdi & Deniss Project"}</button>` : ""}
       </div>
       ${projectTable(visibleRows, { admin: true, includeClient: !isNicolasPage, includeScriptRaw: !isNicolasPage, includeDeliverable: !isNicolasPage })}
     </div>
@@ -1397,7 +1397,8 @@ function configureProjectForm(clientPreset = "") {
     editorSelect.value = isAdmin() ? "Unassigned" : currentUser;
   }
 
-  document.querySelector("#modalTitle").textContent = editingProject ? "Edit Project" : isNicolasProject ? "Add Nicolas Project" : "Add Project";
+  const modalTitle = isNicolasProject ? "Add Nicolas Project" : ["Mehdi", "Deniss"].includes(selectedClient) ? "Add Mehdi & Deniss Project" : "Add Project";
+  document.querySelector("#modalTitle").textContent = editingProject ? "Edit Project" : modalTitle;
   document.querySelector("#projectSubmitButton").textContent = editingProject ? "Save Changes" : "Create Project";
   document.querySelectorAll("[data-form-field]").forEach(field => {
     const name = field.dataset.formField;
