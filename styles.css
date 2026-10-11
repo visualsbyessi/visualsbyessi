@@ -1040,6 +1040,13 @@ tr.row-selected {
   overflow: hidden;
 }
 
+.invoice-type-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 14px;
+}
+
 .breakdown-scroll {
   overflow: auto;
   max-height: 330px;

@@ -976,6 +976,9 @@ function renderDashboard() {
   const invoices = deniss.concat(nicolas).reduce((sum, p) => sum + invoiceAmount(p), 0);
   const invoiceRows = billable.filter(p => dashboardInvoiceFilter === "all" || p.client === dashboardInvoiceFilter);
   const invoiceCardClass = client => dashboardInvoiceFilter === client ? " active-filter" : "";
+  const typeSummary = ["Regular Edit", "Long Story", "Easy", "Hard"]
+    .map(type => ({ type, count: invoiceRows.filter(project => project.type === type).length }))
+    .filter(item => item.count > 0);
 
   document.querySelector("#view-dashboard").innerHTML = `
     <div class="cards">
@@ -987,6 +990,11 @@ function renderDashboard() {
     <div class="two-col">
       <div class="panel breakdown-table">
         <div class="panel-header"><h2>Client Invoice Breakdown</h2></div>
+        ${typeSummary.length ? `
+          <div class="invoice-type-summary">
+            ${typeSummary.map(item => `<span class="chip type-${chipClass(item.type)}">${item.type}: ${item.count}</span>`).join("")}
+          </div>
+        ` : ""}
         <div class="breakdown-scroll">
           <table>
             <thead><tr><th>Project</th><th>Client</th><th>Type</th><th>Rate</th><th>Total</th><th>Paid</th></tr></thead>
