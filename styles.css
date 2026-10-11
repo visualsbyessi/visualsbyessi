@@ -1038,6 +1038,9 @@ tr.row-selected {
 
 .breakdown-table {
   overflow: hidden;
+  min-height: 350px;
+  display: flex;
+  flex-direction: column;
 }
 
 .invoice-type-summary {
@@ -1061,6 +1064,7 @@ tr.row-selected {
 .breakdown-scroll {
   overflow: auto;
   max-height: 330px;
+  min-height: 235px;
   border-radius: 14px;
 }
 
@@ -1123,6 +1127,12 @@ tr.row-selected {
 .breakdown-table th:last-child,
 .breakdown-table td:last-child {
   text-align: right;
+}
+
+.breakdown-table .empty-row {
+  height: 175px;
+  text-align: center;
+  vertical-align: middle;
 }
 
 .quick-links {

@@ -813,8 +813,8 @@ function editorChip(editor) {
 
 function actionButton(p, editor = activeEditor, admin = false) {
   const allowed = allowedEditors(p.client).includes(editor);
-  const canEdit = p.status !== "Paid" && (admin || (p.client === "Nicolas" && p.editor === editor));
-  const canDelete = p.status !== "Paid" && (admin || p.editor === editor);
+  const canEdit = admin || (p.status !== "Paid" && p.client === "Nicolas" && p.editor === editor);
+  const canDelete = admin || (p.status !== "Paid" && p.editor === editor);
   const toggle = (checked, action, title) => `
     <button class="project-toggle ${checked ? "is-on" : ""}" data-action="${action}" data-id="${p.id}" title="${title}" aria-label="${title}">
       <span></span>
@@ -824,7 +824,7 @@ function actionButton(p, editor = activeEditor, admin = false) {
     ${canEdit ? `<button class="icon-action" data-action="edit-project" data-id="${p.id}" title="Edit">${icon("pen")}</button>` : ""}
     ${canDelete ? `<button class="icon-action danger-icon" data-action="delete-project" data-id="${p.id}" title="Delete">${icon("trash")}</button>` : ""}
   `;
-  if (p.status === "Paid") return `<div class="icon-actions"><button class="icon-action" disabled title="Locked">${icon("lock")}</button></div>`;
+  if (p.status === "Paid" && !admin) return `<div class="icon-actions"><button class="icon-action" disabled title="Locked">${icon("lock")}</button></div>`;
   if (admin && p.editor) return `<div class="icon-actions">${toggle(true, "release", "Release")}${baseActions}</div>`;
   if (!p.editor && allowed) return `<div class="icon-actions">${toggle(false, "take", "Take Project")}${baseActions}</div>`;
   if (p.editor === editor) return `<div class="icon-actions">${toggle(true, "release", "Release")}${baseActions}</div>`;
@@ -843,7 +843,7 @@ function deliverableCell(p) {
 
 function renderStatusSelect(p, admin = false) {
   if (!p.editor) return `<span class="open-slot">Open to take</span>`;
-  if (p.status === "Paid") return statusPill("Paid");
+  if (!admin && (p.status === "Paid" || p.paidAt)) return statusPill("Paid");
   const options = statusOptions.map(status => {
     const disabled = status === "Paid" && !admin ? "disabled" : "";
     return `<option ${status === p.status ? "selected" : ""} ${disabled}>${status}</option>`;
@@ -1613,7 +1613,11 @@ document.addEventListener("change", async (event) => {
 
   if (event.target.dataset.action === "status") {
     const p = projects.find(project => String(project.id) === event.target.dataset.id);
-    if (p?.status === "Paid") {
+    if ((p?.status === "Paid" || p?.paidAt) && event.target.dataset.admin !== "true") {
+      if (p && p.status !== "Paid") {
+        p.status = "Paid";
+        saveProjectRemote(p);
+      }
       renderAll();
       setView(currentView);
       return;
