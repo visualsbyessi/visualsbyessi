@@ -480,6 +480,8 @@ let workspaceMode = "mine";
 let workspaceStatusFilter = "all";
 let clientStatusFilters = { md: "all", nicolas: "all" };
 let dashboardInvoiceFilter = "all";
+let dashboardBreakdownMode = "invoice";
+let dashboardPayoutEditor = "all";
 let currentView = "dashboard";
 let searchTerm = "";
 let editingEditorName = null;
@@ -975,60 +977,101 @@ function renderDashboard() {
   const payouts = payable.reduce((sum, p) => sum + editorPay(p), 0);
   const invoices = deniss.concat(nicolas).reduce((sum, p) => sum + invoiceAmount(p), 0);
   const invoiceRows = billable.filter(p => dashboardInvoiceFilter === "all" || p.client === dashboardInvoiceFilter);
-  const invoiceCardClass = client => dashboardInvoiceFilter === client ? " active-filter" : "";
+  const invoiceCardClass = client => dashboardBreakdownMode === "invoice" && dashboardInvoiceFilter === client ? " active-filter" : "";
+  const payoutCardClass = dashboardBreakdownMode === "payout" ? " active-filter" : "";
   const typeSummary = ["Regular Edit", "Long Story", "Easy", "Hard"]
     .map(type => ({ type, count: invoiceRows.filter(project => project.type === type).length }))
     .filter(item => item.count > 0);
+  const payoutRows = payable.filter(project => project.editor);
+  const filteredPayoutRows = payoutRows.filter(project => dashboardPayoutEditor === "all" || project.editor === dashboardPayoutEditor);
+  const summaryTitle = dashboardBreakdownMode === "payout" ? "Payout Summary" : "Invoice Summary";
 
   document.querySelector("#view-dashboard").innerHTML = `
     <div class="cards">
       <div class="card invoice-filter-card${invoiceCardClass("Deniss")}" data-invoice-filter="Deniss"><span class="card-icon">${icon("file")}</span><span class="label">Deniss invoice</span><strong>${money(deniss.reduce((s, p) => s + invoiceAmount(p), 0))}</strong><small>${deniss.length} unpaid videos</small></div>
       <div class="card invoice-filter-card${invoiceCardClass("Nicolas")}" data-invoice-filter="Nicolas"><span class="card-icon">${icon("file")}</span><span class="label">Nicolas invoice</span><strong>${money(nicolas.reduce((s, p) => s + invoiceAmount(p), 0))}</strong><small>${nicolas.length} unpaid videos</small></div>
-      <div class="card"><span class="card-icon green-icon">${icon("wallet")}</span><span class="label">Editor payouts</span><strong>₱${payouts.toLocaleString()}</strong><small>Unpaid done work</small></div>
+      <div class="card invoice-filter-card${payoutCardClass}" data-payout-filter="true"><span class="card-icon green-icon">${icon("wallet")}</span><span class="label">Editor payouts</span><strong>₱${payouts.toLocaleString()}</strong><small>Unpaid done work</small></div>
       <div class="card invoice-filter-card${invoiceCardClass("all")}" data-invoice-filter="all"><span class="card-icon">${icon("wallet")}</span><span class="label">Invoice total</span><strong>${money(invoices)}</strong><small>Total unpaid billable</small></div>
     </div>
     <div class="two-col">
       <div class="panel breakdown-table">
-        <div class="panel-header"><h2>Client Invoice Breakdown</h2></div>
-        ${typeSummary.length ? `
-          <div class="invoice-type-summary">
-            ${typeSummary.map(item => `<span class="chip type-${chipClass(item.type)}">${item.type}: ${item.count}</span>`).join("")}
-          </div>
-        ` : ""}
+        <div class="panel-header">
+          <h2>Work Breakdown</h2>
+          ${dashboardBreakdownMode === "payout" ? `
+            <select class="compact-select" data-action="payout-editor-filter" aria-label="Filter editor payout breakdown">
+              <option value="all"${dashboardPayoutEditor === "all" ? " selected" : ""}>All editors</option>
+              ${editors.map(editor => `<option value="${editor}"${dashboardPayoutEditor === editor ? " selected" : ""}>${editor}</option>`).join("")}
+            </select>
+          ` : ""}
+        </div>
         <div class="breakdown-scroll">
-          <table>
-            <thead><tr><th>Project</th><th>Client</th><th>Type</th><th>Rate</th><th>Total</th><th>Paid</th></tr></thead>
-            <tbody>
-              ${invoiceRows.length ? invoiceRows.map(project => `
-                <tr>
-                  <td><strong>${project.project}</strong></td>
-                  <td>${project.client}</td>
-                  <td>${typeChip(project)}</td>
-                  <td>${invoiceRate(project)}</td>
-                  <td>${money(invoiceAmount(project))}</td>
-                  <td>
-                    <button class="project-toggle" data-action="invoice-paid" data-id="${project.id}" title="Mark paid" aria-label="Mark ${project.project} paid">
-                      <span></span>
-                    </button>
-                  </td>
-                </tr>
-              `).join("") : `<tr><td colspan="6" class="empty-row">No unpaid invoice items</td></tr>`}
-            </tbody>
-          </table>
+          ${dashboardBreakdownMode === "payout" ? `
+            <table>
+              <thead><tr><th>Project</th><th>Editor</th><th>Client</th><th>Type</th><th>Total Pay</th><th>Paid</th></tr></thead>
+              <tbody>
+                ${filteredPayoutRows.length ? filteredPayoutRows.map(project => `
+                  <tr>
+                    <td><strong>${project.project}</strong></td>
+                    <td>${editorChip(project.editor)}</td>
+                    <td>${project.client}</td>
+                    <td>${typeChip(project)}</td>
+                    <td>₱${editorPay(project).toLocaleString()}</td>
+                    <td>
+                      <button class="project-toggle" data-action="invoice-paid" data-id="${project.id}" title="Mark paid" aria-label="Mark ${project.project} paid">
+                        <span></span>
+                      </button>
+                    </td>
+                  </tr>
+                `).join("") : `<tr><td colspan="6" class="empty-row">No payout items for this editor</td></tr>`}
+              </tbody>
+            </table>
+          ` : `
+            <table>
+              <thead><tr><th>Project</th><th>Client</th><th>Type</th><th>Rate</th><th>Total</th><th>Paid</th></tr></thead>
+              <tbody>
+                ${invoiceRows.length ? invoiceRows.map(project => `
+                  <tr>
+                    <td><strong>${project.project}</strong></td>
+                    <td>${project.client}</td>
+                    <td>${typeChip(project)}</td>
+                    <td>${invoiceRate(project)}</td>
+                    <td>${money(invoiceAmount(project))}</td>
+                    <td>
+                      <button class="project-toggle" data-action="invoice-paid" data-id="${project.id}" title="Mark paid" aria-label="Mark ${project.project} paid">
+                        <span></span>
+                      </button>
+                    </td>
+                  </tr>
+                `).join("") : `<tr><td colspan="6" class="empty-row">No unpaid invoice items</td></tr>`}
+              </tbody>
+            </table>
+          `}
         </div>
       </div>
       <div class="panel breakdown-table payout-table">
-        <div class="panel-header"><h2>Editor Payouts</h2></div>
+        <div class="panel-header"><h2>${summaryTitle}</h2></div>
         <div class="breakdown-scroll">
-          <table>
-            <thead><tr><th>Editor</th><th>Videos</th><th>Total Pay</th></tr></thead>
-            <tbody>
-              ${editors.map(ed => {
-                const rows = payable.filter(p => p.editor === ed);
-                return `<tr><td>${ed}</td><td>${rows.length}</td><td>₱${rows.reduce((s, p) => s + editorPay(p), 0).toLocaleString()}</td></tr>`;
-              }).join("")}
-            </tbody>
-          </table>
+          ${dashboardBreakdownMode === "payout" ? `
+            <table>
+              <thead><tr><th>Editor</th><th>Videos</th><th>Total Pay</th></tr></thead>
+              <tbody>
+                ${editors.map(ed => {
+                  const rows = payable.filter(p => p.editor === ed);
+                  return `<tr><td>${ed}</td><td>${rows.length}</td><td>₱${rows.reduce((s, p) => s + editorPay(p), 0).toLocaleString()}</td></tr>`;
+                }).join("")}
+              </tbody>
+            </table>
+          ` : `
+            <table>
+              <thead><tr><th>Type</th><th>Videos</th><th>Total</th></tr></thead>
+              <tbody>
+                ${typeSummary.length ? typeSummary.map(item => {
+                  const rows = invoiceRows.filter(project => project.type === item.type);
+                  return `<tr><td>${typeChip({ type: item.type })}</td><td>${item.count}</td><td>${money(rows.reduce((sum, project) => sum + invoiceAmount(project), 0))}</td></tr>`;
+                }).join("") : `<tr><td colspan="3" class="empty-row">No invoice summary yet</td></tr>`}
+              </tbody>
+            </table>
+          `}
         </div>
       </div>
     </div>
@@ -1438,7 +1481,15 @@ document.addEventListener("click", async (event) => {
 
   const invoiceFilterCard = event.target.closest("[data-invoice-filter]");
   if (invoiceFilterCard) {
+    dashboardBreakdownMode = "invoice";
     dashboardInvoiceFilter = invoiceFilterCard.dataset.invoiceFilter || "all";
+    renderAll();
+    setView("dashboard");
+  }
+
+  const payoutFilterCard = event.target.closest("[data-payout-filter]");
+  if (payoutFilterCard) {
+    dashboardBreakdownMode = "payout";
     renderAll();
     setView("dashboard");
   }
@@ -1587,6 +1638,12 @@ document.addEventListener("change", async (event) => {
     }
     await cleanupExpiredPaidProjects();
     renderAll();
+  }
+
+  if (event.target.dataset.action === "payout-editor-filter") {
+    dashboardPayoutEditor = event.target.value || "all";
+    renderAll();
+    setView("dashboard");
   }
 });
 

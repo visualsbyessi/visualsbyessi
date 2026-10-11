@@ -1047,6 +1047,17 @@ tr.row-selected {
   margin: -4px 0 14px;
 }
 
+.compact-select {
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 0 12px;
+  font: inherit;
+  font-weight: 700;
+}
+
 .breakdown-scroll {
   overflow: auto;
   max-height: 330px;
