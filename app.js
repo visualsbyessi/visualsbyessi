@@ -17,6 +17,7 @@ const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
 const DISCORD_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/discord-notify`;
 let remoteEnabled = true;
 let remotePaidAtEnabled = true;
+let remoteTrashEnabled = true;
 let liveSyncRunning = false;
 const PAID_DELETE_AFTER_DAYS = 7;
 
@@ -81,7 +82,7 @@ async function loadRemoteData() {
       rebuildAccessLists();
     }
 
-    const remoteProjects = await supabaseRequest("/projects?select=*,editors(name)&order=created_at.asc");
+    const remoteProjects = await supabaseRequest("/projects?select=*,editors(name)&order=created_at.desc");
     projects.splice(0, projects.length, ...remoteProjects.map(project => ({
       id: project.id,
       client: project.client,
@@ -95,9 +96,12 @@ async function loadRemoteData() {
       status: project.status || "To Do",
       deliverable: project.deliverable_link || "",
       duration: Number(project.duration_minutes || 0),
-      paidAt: project.paid_at || ""
+      paidAt: project.paid_at || "",
+      deletedAt: project.deleted_at || "",
+      deletedBy: project.deleted_by || ""
     })));
     await cleanupExpiredPaidProjects();
+    await cleanupExpiredTrashProjects();
 
     const remoteLinks = await supabaseRequest("/quick_links?select=*&order=created_at.desc");
     quickLinks.splice(0, quickLinks.length, ...remoteLinks.map(link => ({
@@ -189,6 +193,10 @@ async function saveProjectRemote(project) {
     duration_minutes: project.duration || null
   };
   if (remotePaidAtEnabled) payload.paid_at = project.paidAt || null;
+  if (remoteTrashEnabled) {
+    payload.deleted_at = project.deletedAt || null;
+    payload.deleted_by = project.deletedBy || null;
+  }
   try {
     if (typeof project.id === "string" && project.id.length > 20) {
       await supabaseRequest(`/projects?id=eq.${project.id}`, {
@@ -206,6 +214,24 @@ async function saveProjectRemote(project) {
     if (remotePaidAtEnabled && String(error.message || "").includes("paid_at")) {
       remotePaidAtEnabled = false;
       delete payload.paid_at;
+      if (typeof project.id === "string" && project.id.length > 20) {
+        await supabaseRequest(`/projects?id=eq.${project.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload)
+        });
+      } else {
+        const [created] = await supabaseRequest("/projects", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        if (created?.id) project.id = created.id;
+      }
+      return;
+    }
+    if (remoteTrashEnabled && String(error.message || "").includes("deleted_")) {
+      remoteTrashEnabled = false;
+      delete payload.deleted_at;
+      delete payload.deleted_by;
       if (typeof project.id === "string" && project.id.length > 20) {
         await supabaseRequest(`/projects?id=eq.${project.id}`, {
           method: "PATCH",
@@ -280,8 +306,20 @@ async function deleteQuickLinkRemote(link) {
 async function cleanupExpiredPaidProjects() {
   const cutoff = Date.now() - PAID_DELETE_AFTER_DAYS * 24 * 60 * 60 * 1000;
   const expired = projects.filter(project => {
-    if (project.status !== "Paid" || !project.paidAt) return false;
+    if (project.deletedAt || project.status !== "Paid" || !project.paidAt) return false;
     return new Date(project.paidAt).getTime() < cutoff;
+  });
+  if (!expired.length) return;
+  for (const project of expired) {
+    await softDeleteProject(project, "System");
+  }
+}
+
+async function cleanupExpiredTrashProjects() {
+  const cutoff = Date.now() - PAID_DELETE_AFTER_DAYS * 24 * 60 * 60 * 1000;
+  const expired = projects.filter(project => {
+    if (!project.deletedAt) return false;
+    return new Date(project.deletedAt).getTime() < cutoff;
   });
   if (!expired.length) return;
   for (const project of expired) {
@@ -449,7 +487,7 @@ let editingLinkId = null;
 let draggingQuickLinkGroup = "";
 const selectedProjectIds = new Set();
 let nextId = 15;
-const defaultNavOrder = ["dashboard", "md", "nicolas", "editors", "workspace", "links", "viewas"];
+const defaultNavOrder = ["dashboard", "md", "nicolas", "editors", "workspace", "links", "trash", "viewas"];
 let currentTheme = localStorage.getItem("visualsByEssiTheme") || "day";
 
 const projects = [
@@ -547,6 +585,40 @@ function editorPay(project) {
   if (project.client === "Nicolas") return project.type === "Hard" ? 500 : 350;
   if (mdEditors.includes(project.editor)) return 350;
   return 0;
+}
+
+function activeProjects() {
+  return projects.filter(project => !project.deletedAt);
+}
+
+function trashProjectsForCurrentUser() {
+  if (isAdmin()) return projects.filter(project => project.deletedAt);
+  return projects.filter(project => project.deletedAt && project.deletedBy === currentUser);
+}
+
+function softDeleteProject(project, deletedBy = currentUser || activeEditor || "Essi") {
+  project.deletedAt = new Date().toISOString();
+  project.deletedBy = deletedBy;
+  selectedProjectIds.delete(String(project.id));
+  return saveProjectRemote(project);
+}
+
+function restoreProject(project) {
+  if (!isAdmin() && project.deletedBy !== currentUser) return Promise.resolve();
+  project.deletedAt = "";
+  project.deletedBy = "";
+  selectedProjectIds.delete(String(project.id));
+  return saveProjectRemote(project);
+}
+
+function isDuplicateProject(candidate, ignoreId = "") {
+  const clean = value => String(value || "").trim().toLowerCase();
+  return activeProjects().some(project =>
+    String(project.id) !== String(ignoreId) &&
+    clean(project.client) === clean(candidate.client) &&
+    clean(project.project) === clean(candidate.project) &&
+    clean(project.type) === clean(candidate.type)
+  );
 }
 
 function invoiceAmount(project) {
@@ -733,7 +805,7 @@ function editorChip(editor) {
 function actionButton(p, editor = activeEditor, admin = false) {
   const allowed = allowedEditors(p.client).includes(editor);
   const canEdit = p.status !== "Paid" && (admin || (p.client === "Nicolas" && p.editor === editor));
-  const canDelete = admin || p.editor === editor;
+  const canDelete = p.status !== "Paid" && (admin || p.editor === editor);
   const toggle = (checked, action, title) => `
     <button class="project-toggle ${checked ? "is-on" : ""}" data-action="${action}" data-id="${p.id}" title="${title}" aria-label="${title}">
       <span></span>
@@ -743,7 +815,7 @@ function actionButton(p, editor = activeEditor, admin = false) {
     ${canEdit ? `<button class="icon-action" data-action="edit-project" data-id="${p.id}" title="Edit">${icon("pen")}</button>` : ""}
     ${canDelete ? `<button class="icon-action danger-icon" data-action="delete-project" data-id="${p.id}" title="Delete">${icon("trash")}</button>` : ""}
   `;
-  if (p.status === "Paid") return `<div class="icon-actions"><button class="icon-action" disabled title="Locked">${icon("lock")}</button>${baseActions}</div>`;
+  if (p.status === "Paid") return `<div class="icon-actions"><button class="icon-action" disabled title="Locked">${icon("lock")}</button></div>`;
   if (admin && p.editor) return `<div class="icon-actions">${toggle(true, "release", "Release")}${baseActions}</div>`;
   if (!p.editor && allowed) return `<div class="icon-actions">${toggle(false, "take", "Take Project")}${baseActions}</div>`;
   if (p.editor === editor) return `<div class="icon-actions">${toggle(true, "release", "Release")}${baseActions}</div>`;
@@ -762,6 +834,7 @@ function deliverableCell(p) {
 
 function renderStatusSelect(p, admin = false) {
   if (!p.editor) return `<span class="open-slot">Open to take</span>`;
+  if (p.status === "Paid") return statusPill("Paid");
   const options = statusOptions.map(status => {
     const disabled = status === "Paid" && !admin ? "disabled" : "";
     return `<option ${status === p.status ? "selected" : ""} ${disabled}>${status}</option>`;
@@ -784,6 +857,7 @@ function matchesSearch(project) {
 function projectTable(rows, opts = {}) {
   const admin = opts.admin || false;
   const editor = opts.editor || activeEditor;
+  const allowBulk = opts.allowBulk || admin;
   const includeClient = opts.includeClient !== false;
   const includeScriptRaw = opts.includeScriptRaw !== false;
   const includeDeliverable = opts.includeDeliverable !== false;
@@ -792,9 +866,9 @@ function projectTable(rows, opts = {}) {
   [...selectedProjectIds].forEach(id => {
     if (!visibleIds.has(id)) selectedProjectIds.delete(id);
   });
-  const selectedCount = admin ? selectedProjectIds.size : 0;
+  const selectedCount = allowBulk ? selectedProjectIds.size : 0;
   return `
-    ${admin ? `
+    ${allowBulk ? `
       <div class="bulk-actions ${selectedCount ? "" : "hidden"}">
         <strong>${selectedCount} selected</strong>
         <button class="danger-button" data-action="delete-selected">${icon("trash")} Delete selected</button>
@@ -804,7 +878,7 @@ function projectTable(rows, opts = {}) {
       <table>
         <thead>
           <tr>
-            ${admin ? "<th class='mark-col'>Mark</th>" : ""}
+            ${allowBulk ? "<th class='mark-col'>Mark</th>" : ""}
             <th>Project</th>
             ${includeClient ? "<th>Client</th>" : ""}
             <th>Type</th>
@@ -818,7 +892,7 @@ function projectTable(rows, opts = {}) {
         <tbody>
           ${filteredRows.length ? filteredRows.map(p => `
             <tr class="${selectedProjectIds.has(String(p.id)) ? "row-selected" : ""}">
-              ${admin ? `<td class="mark-col"><input class="mark-project" type="checkbox" data-action="mark-project" data-id="${p.id}" ${selectedProjectIds.has(String(p.id)) ? "checked" : ""} aria-label="Mark ${p.project}" /></td>` : ""}
+              ${allowBulk ? `<td class="mark-col"><input class="mark-project" type="checkbox" data-action="mark-project" data-id="${p.id}" ${selectedProjectIds.has(String(p.id)) ? "checked" : ""} ${p.status === "Paid" ? "disabled" : ""} aria-label="Mark ${p.project}" /></td>` : ""}
               <td><strong>${p.project}</strong></td>
               ${includeClient ? `<td>${p.client}</td>` : ""}
               <td>${typeChip(p)}</td>
@@ -886,10 +960,12 @@ function topEarnings(editor) {
 }
 
 function renderDashboard() {
-  const billable = projects.filter(p => ["Done", "Paid"].includes(p.status));
+  const active = activeProjects();
+  const billable = active.filter(p => ["Done", "Paid"].includes(p.status));
+  const payable = active.filter(p => p.status === "Done");
   const deniss = billable.filter(p => p.client === "Deniss");
   const nicolas = billable.filter(p => p.client === "Nicolas");
-  const payouts = billable.reduce((sum, p) => sum + editorPay(p), 0);
+  const payouts = payable.reduce((sum, p) => sum + editorPay(p), 0);
   const invoices = deniss.concat(nicolas).reduce((sum, p) => sum + invoiceAmount(p), 0);
   const regular = deniss.filter(p => p.type === "Regular Edit");
   const longStory = deniss.filter(p => p.type === "Long Story");
@@ -900,7 +976,7 @@ function renderDashboard() {
     <div class="cards">
       <div class="card"><span class="card-icon">${icon("file")}</span><span class="label">Deniss invoice</span><strong>${money(deniss.reduce((s, p) => s + invoiceAmount(p), 0))}</strong><small>${deniss.length} billable videos</small></div>
       <div class="card"><span class="card-icon">${icon("file")}</span><span class="label">Nicolas invoice</span><strong>${money(nicolas.reduce((s, p) => s + invoiceAmount(p), 0))}</strong><small>${nicolas.length} billable videos</small></div>
-      <div class="card"><span class="card-icon green-icon">${icon("wallet")}</span><span class="label">Editor payouts</span><strong>₱${payouts.toLocaleString()}</strong><small>Done and paid work</small></div>
+      <div class="card"><span class="card-icon green-icon">${icon("wallet")}</span><span class="label">Editor payouts</span><strong>₱${payouts.toLocaleString()}</strong><small>Unpaid done work</small></div>
       <div class="card"><span class="card-icon">${icon("wallet")}</span><span class="label">Invoice total</span><strong>${money(invoices)}</strong><small>Total billable</small></div>
     </div>
     <div class="two-col">
@@ -925,7 +1001,7 @@ function renderDashboard() {
             <thead><tr><th>Editor</th><th>Videos</th><th>Total Pay</th></tr></thead>
             <tbody>
               ${editors.map(ed => {
-                const rows = billable.filter(p => p.editor === ed);
+                const rows = payable.filter(p => p.editor === ed);
                 return `<tr><td>${ed}</td><td>${rows.length}</td><td>₱${rows.reduce((s, p) => s + editorPay(p), 0).toLocaleString()}</td></tr>`;
               }).join("")}
             </tbody>
@@ -935,7 +1011,7 @@ function renderDashboard() {
     </div>
     <div class="panel">
       <div class="panel-header"><h2>All Active Projects</h2></div>
-      ${projectTable(projects, { admin: true })}
+      ${projectTable(active, { admin: true })}
     </div>
   `;
 }
@@ -962,7 +1038,7 @@ function renderClientPage(id, title, rows) {
 }
 
 function renderWorkspace(editor = activeEditor, target = "#view-workspace") {
-  const rows = projects.filter(p => p.editor === editor || (!p.editor && allowedEditors(p.client).includes(editor)));
+  const rows = activeProjects().filter(p => p.editor === editor || (!p.editor && allowedEditors(p.client).includes(editor)));
   const addNicolas = canCreateNicolasProject(editor) && target === "#view-workspace";
   const modeRows = workspaceMode === "all" ? rows : workspaceMode === "available" ? rows.filter(p => !p.editor) : rows.filter(p => p.editor === editor);
   const visibleRows = filterRowsByStatus(modeRows, workspaceStatusFilter);
@@ -987,7 +1063,7 @@ function renderWorkspace(editor = activeEditor, target = "#view-workspace") {
           </div>
         </div>
       </div>
-      ${projectTable(visibleRows, { editor, admin: false, includeClient: !nicolasOnly, includeScriptRaw: !nicolasOnly, includeDeliverable: !nicolasOnly })}
+      ${projectTable(visibleRows, { editor, admin: false, allowBulk: target === "#view-workspace", includeClient: !nicolasOnly, includeScriptRaw: !nicolasOnly, includeDeliverable: !nicolasOnly })}
     </div>
   `;
 }
@@ -1093,23 +1169,57 @@ function renderViewAs() {
   };
 }
 
+function renderTrash() {
+  const rows = trashProjectsForCurrentUser().filter(matchesSearch);
+  document.querySelector("#view-trash").innerHTML = `
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Trash</h2>
+          <p class="muted">${isAdmin() ? "Deleted projects from all editors." : "Projects you deleted."} Trash empties after one week.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Project</th><th>Client</th><th>Type</th><th>Status</th><th>Editor</th><th>Deleted By</th><th>Action</th></tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(project => `
+              <tr>
+                <td><strong>${project.project}</strong></td>
+                <td>${project.client}</td>
+                <td>${typeChip(project)}</td>
+                <td>${statusPill(project.status || "To Do")}</td>
+                <td>${editorChip(project.editor)}</td>
+                <td>${project.deletedBy || "-"}</td>
+                <td><button class="ghost-button" data-action="restore-project" data-id="${project.id}">${icon("release")} Restore</button></td>
+              </tr>
+            `).join("") : `<tr><td colspan="7" class="empty-row">Trash is empty</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 function renderAll() {
+  const active = activeProjects();
   renderDashboard();
-  renderClientPage("#view-md", "Mehdi & Deniss Workspace", projects.filter(p => p.client === "Mehdi" || p.client === "Deniss"));
-  renderClientPage("#view-nicolas", "Nicolas Workspace", projects.filter(p => p.client === "Nicolas"));
+  renderClientPage("#view-md", "Mehdi & Deniss Workspace", active.filter(p => p.client === "Mehdi" || p.client === "Deniss"));
+  renderClientPage("#view-nicolas", "Nicolas Workspace", active.filter(p => p.client === "Nicolas"));
   renderEditors();
   renderWorkspace(currentUser || "Essi", "#view-workspace");
   renderLinks();
+  renderTrash();
   renderViewAs();
 }
 
 function setView(view) {
-  if (!isAdmin() && !["workspace", "links"].includes(view)) view = "workspace";
+  if (!isAdmin() && !["workspace", "links", "trash"].includes(view)) view = "workspace";
   currentView = view;
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active-view"));
   document.querySelector(`#view-${view}`).classList.add("active-view");
   document.querySelectorAll(".nav-item").forEach(item => item.classList.toggle("active", item.dataset.view === view));
-  const labels = { dashboard: "Dashboard", md: "Mehdi & Deniss", nicolas: "Nicolas", editors: "Editors", workspace: `${currentUser || "Essi"} Workspace`, links: "Quick Links", viewas: "View As Editor" };
+  const labels = { dashboard: "Dashboard", md: "Mehdi & Deniss", nicolas: "Nicolas", editors: "Editors", workspace: `${currentUser || "Essi"} Workspace`, links: "Quick Links", trash: "Trash", viewas: "View As Editor" };
   document.querySelector("#page-title").textContent = labels[view];
   updateTopbar(view);
 }
@@ -1348,29 +1458,31 @@ document.addEventListener("click", async (event) => {
 
   if (action === "delete-project") {
     const project = projects.find(item => String(item.id) === actionButtonEl.dataset.id);
-    if (!project) return;
-    if (!confirm(`Delete ${project.project}?`)) return;
-    await deleteProjectRemote(project);
-    const index = projects.findIndex(item => String(item.id) === String(project.id));
-    if (index > -1) projects.splice(index, 1);
-    selectedProjectIds.delete(String(project.id));
+    if (!project || project.status === "Paid") return;
+    if (!confirm(`Move ${project.project} to Trash?`)) return;
+    await softDeleteProject(project);
     renderAll();
     setView(currentView);
   }
 
   if (action === "delete-selected") {
-    const selectedProjects = projects.filter(project => selectedProjectIds.has(String(project.id)));
+    const selectedProjects = projects.filter(project => selectedProjectIds.has(String(project.id)) && project.status !== "Paid");
     if (!selectedProjects.length) return;
-    if (!confirm(`Delete ${selectedProjects.length} selected project${selectedProjects.length > 1 ? "s" : ""}?`)) return;
+    if (!confirm(`Move ${selectedProjects.length} selected project${selectedProjects.length > 1 ? "s" : ""} to Trash?`)) return;
     for (const project of selectedProjects) {
-      await deleteProjectRemote(project);
-    }
-    for (let index = projects.length - 1; index >= 0; index -= 1) {
-      if (selectedProjectIds.has(String(projects[index].id))) projects.splice(index, 1);
+      await softDeleteProject(project);
     }
     selectedProjectIds.clear();
     renderAll();
     setView(currentView);
+  }
+
+  if (action === "restore-project") {
+    const project = projects.find(item => String(item.id) === actionButtonEl.dataset.id);
+    if (!project) return;
+    await restoreProject(project);
+    renderAll();
+    setView("trash");
   }
 
   if (action === "delete-editor") {
@@ -1408,6 +1520,11 @@ document.addEventListener("change", async (event) => {
 
   if (event.target.dataset.action === "status") {
     const p = projects.find(project => String(project.id) === event.target.dataset.id);
+    if (p?.status === "Paid") {
+      renderAll();
+      setView(currentView);
+      return;
+    }
     if (p && (event.target.dataset.admin === "true" || event.target.value !== "Paid")) {
       const previousStatus = p.status || "";
       p.status = event.target.value;
@@ -1558,7 +1675,11 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
     duration: selectedClient === "Deniss" && data.type === "Long Story" ? parseDuration(data.duration) : 0,
     editor: !isAdmin() ? currentUser : data.editor === "Unassigned" ? "" : data.editor
   });
-  if (!existingProject) projects.unshift(project);
+  if (!existingProject && isDuplicateProject(project)) {
+    alert("This project already exists. Duplicate entry was not added.");
+    return;
+  }
+  if (!existingProject && !isDuplicateProject(project)) projects.unshift(project);
   const shouldNotifyAssigned = isAdmin() && project.editor && previousEditor !== project.editor;
   const shouldNotifyAddedNicolas = !existingProject && selectedClient === "Nicolas" && !isAdmin();
   const shouldNotifyUnassignedAdded = isAdmin() && !existingProject && !project.editor;
