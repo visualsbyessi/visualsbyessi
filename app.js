@@ -479,6 +479,7 @@ let previewEditor = "Essi";
 let workspaceMode = "mine";
 let workspaceStatusFilter = "all";
 let clientStatusFilters = { md: "all", nicolas: "all" };
+let dashboardInvoiceFilter = "all";
 let currentView = "dashboard";
 let searchTerm = "";
 let editingEditorName = null;
@@ -628,6 +629,12 @@ function invoiceAmount(project) {
   }
   if (project.client === "Nicolas") return project.type === "Hard" ? 20 : 15;
   return 0;
+}
+
+function invoiceRate(project) {
+  if (project.client === "Deniss") return project.type === "Long Story" ? "$25 per 2 min" : "$20/video";
+  if (project.client === "Nicolas") return project.type === "Hard" ? "$20/video" : "$15/video";
+  return "-";
 }
 
 function counts(rows) {
@@ -961,35 +968,43 @@ function topEarnings(editor) {
 
 function renderDashboard() {
   const active = activeProjects();
-  const billable = active.filter(p => ["Done", "Paid"].includes(p.status));
+  const billable = active.filter(p => p.status === "Done");
   const payable = active.filter(p => p.status === "Done");
   const deniss = billable.filter(p => p.client === "Deniss");
   const nicolas = billable.filter(p => p.client === "Nicolas");
   const payouts = payable.reduce((sum, p) => sum + editorPay(p), 0);
   const invoices = deniss.concat(nicolas).reduce((sum, p) => sum + invoiceAmount(p), 0);
-  const regular = deniss.filter(p => p.type === "Regular Edit");
-  const longStory = deniss.filter(p => p.type === "Long Story");
-  const easy = nicolas.filter(p => p.type === "Easy");
-  const hard = nicolas.filter(p => p.type === "Hard");
+  const invoiceRows = billable.filter(p => dashboardInvoiceFilter === "all" || p.client === dashboardInvoiceFilter);
+  const invoiceCardClass = client => dashboardInvoiceFilter === client ? " active-filter" : "";
 
   document.querySelector("#view-dashboard").innerHTML = `
     <div class="cards">
-      <div class="card"><span class="card-icon">${icon("file")}</span><span class="label">Deniss invoice</span><strong>${money(deniss.reduce((s, p) => s + invoiceAmount(p), 0))}</strong><small>${deniss.length} billable videos</small></div>
-      <div class="card"><span class="card-icon">${icon("file")}</span><span class="label">Nicolas invoice</span><strong>${money(nicolas.reduce((s, p) => s + invoiceAmount(p), 0))}</strong><small>${nicolas.length} billable videos</small></div>
+      <div class="card invoice-filter-card${invoiceCardClass("Deniss")}" data-invoice-filter="Deniss"><span class="card-icon">${icon("file")}</span><span class="label">Deniss invoice</span><strong>${money(deniss.reduce((s, p) => s + invoiceAmount(p), 0))}</strong><small>${deniss.length} unpaid videos</small></div>
+      <div class="card invoice-filter-card${invoiceCardClass("Nicolas")}" data-invoice-filter="Nicolas"><span class="card-icon">${icon("file")}</span><span class="label">Nicolas invoice</span><strong>${money(nicolas.reduce((s, p) => s + invoiceAmount(p), 0))}</strong><small>${nicolas.length} unpaid videos</small></div>
       <div class="card"><span class="card-icon green-icon">${icon("wallet")}</span><span class="label">Editor payouts</span><strong>₱${payouts.toLocaleString()}</strong><small>Unpaid done work</small></div>
-      <div class="card"><span class="card-icon">${icon("wallet")}</span><span class="label">Invoice total</span><strong>${money(invoices)}</strong><small>Total billable</small></div>
+      <div class="card invoice-filter-card${invoiceCardClass("all")}" data-invoice-filter="all"><span class="card-icon">${icon("wallet")}</span><span class="label">Invoice total</span><strong>${money(invoices)}</strong><small>Total unpaid billable</small></div>
     </div>
     <div class="two-col">
       <div class="panel breakdown-table">
         <div class="panel-header"><h2>Client Invoice Breakdown</h2></div>
         <div class="breakdown-scroll">
           <table>
-            <thead><tr><th>Client</th><th>Type</th><th>Videos</th><th>Rate</th><th>Total</th></tr></thead>
+            <thead><tr><th>Project</th><th>Client</th><th>Type</th><th>Rate</th><th>Total</th><th>Paid</th></tr></thead>
             <tbody>
-              <tr><td>Deniss</td><td>Regular Edit</td><td>${regular.length}</td><td>$20/video</td><td>${money(regular.length * 20)}</td></tr>
-              <tr><td>Deniss</td><td>Long Story</td><td>${longStory.length}</td><td>$25 per 2 min</td><td>${money(longStory.reduce((s, p) => s + invoiceAmount(p), 0))}</td></tr>
-              <tr><td>Nicolas</td><td>Easy</td><td>${easy.length}</td><td>$15/video</td><td>${money(easy.length * 15)}</td></tr>
-              <tr><td>Nicolas</td><td>Hard</td><td>${hard.length}</td><td>$20/video</td><td>${money(hard.length * 20)}</td></tr>
+              ${invoiceRows.length ? invoiceRows.map(project => `
+                <tr>
+                  <td><strong>${project.project}</strong></td>
+                  <td>${project.client}</td>
+                  <td>${typeChip(project)}</td>
+                  <td>${invoiceRate(project)}</td>
+                  <td>${money(invoiceAmount(project))}</td>
+                  <td>
+                    <button class="project-toggle" data-action="invoice-paid" data-id="${project.id}" title="Mark paid" aria-label="Mark ${project.project} paid">
+                      <span></span>
+                    </button>
+                  </td>
+                </tr>
+              `).join("") : `<tr><td colspan="6" class="empty-row">No unpaid invoice items</td></tr>`}
             </tbody>
           </table>
         </div>
@@ -1411,6 +1426,25 @@ document.addEventListener("click", async (event) => {
     }
     renderAll();
     setView(currentView);
+  }
+
+  const invoiceFilterCard = event.target.closest("[data-invoice-filter]");
+  if (invoiceFilterCard) {
+    dashboardInvoiceFilter = invoiceFilterCard.dataset.invoiceFilter || "all";
+    renderAll();
+    setView("dashboard");
+  }
+
+  if (action === "invoice-paid") {
+    const project = projects.find(item => String(item.id) === actionButtonEl.dataset.id);
+    if (!project || project.status === "Paid") return;
+    const previousStatus = project.status || "";
+    project.status = "Paid";
+    project.paidAt = new Date().toISOString();
+    await saveProjectRemote(project);
+    sendDiscordUpdate("paid", project, currentUser || "Essi", previousStatus);
+    renderAll();
+    setView("dashboard");
   }
 
   if (action === "add-nicolas") {
