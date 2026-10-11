@@ -13,7 +13,7 @@
   --green-soft: #dcf4e8;
   --amber: #b56b00;
   --amber-soft: #fff0cc;
-  --red: #c9333c;
+  --red: #b4232c;
   --red-soft: #ffe1e4;
   --gray-soft: #efedeb;
   --shadow: 0 18px 34px rgba(35, 31, 32, 0.08);
@@ -29,6 +29,7 @@ body.night-mode {
   --blue-soft: #17382a;
   --green-soft: #17382a;
   --amber-soft: #3b2c12;
+  --red: #ff8f97;
   --red-soft: #442127;
   --gray-soft: #26322e;
   --shadow: 0 18px 34px rgba(0, 0, 0, 0.28);
@@ -302,11 +303,15 @@ input, select {
   min-height: 40px;
   padding: 9px 12px;
   color: var(--text);
+  color-scheme: light;
 }
 
 body.night-mode input,
 body.night-mode select {
   border-color: var(--line);
+  color-scheme: dark;
+  background: #111b17;
+  color: var(--text);
 }
 
 #search { width: min(320px, 32vw); }
@@ -831,7 +836,25 @@ tr:last-child td { border-bottom: 0; }
 }
 
 tr.row-selected {
-  background: #eff8f1;
+  background: #d8f2e5;
+  box-shadow: inset 5px 0 0 var(--green);
+}
+
+tr.row-selected td {
+  border-bottom-color: #b6dfc8;
+}
+
+body.night-mode tr.row-selected {
+  background: #17382a;
+  box-shadow: inset 5px 0 0 #9ff0c6;
+}
+
+body.night-mode tr.row-selected td {
+  border-bottom-color: #286246;
+}
+
+body.night-mode .mark-project {
+  accent-color: #9ff0c6;
 }
 
 .icon-actions {
@@ -924,6 +947,7 @@ tr.row-selected {
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
 .type-regular-edit { background: #e8f2ff; color: #185a9d; }
@@ -933,9 +957,9 @@ tr.row-selected {
 .type-untyped { background: #edf2f7; color: #526175; }
 
 .editor-chip {
-  background: #f0f5f2;
-  color: var(--green);
-  box-shadow: inset 0 0 0 1px rgba(3, 75, 43, 0.1);
+  background: var(--editor-bg, #f0f5f2);
+  color: var(--editor-fg, var(--green));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--editor-fg, var(--green)) 22%, transparent);
 }
 
 .editor-essi { background: #dcf4e8; color: #034b2b; }
@@ -946,6 +970,11 @@ tr.row-selected {
 .editor-mc { background: #ffe8d7; color: #a44d10; }
 .editor-drix { background: #ffe1e4; color: #c9333c; }
 .editor-unassigned { background: #edf2f7; color: #526175; }
+
+.editor-chip {
+  background: var(--editor-bg, #f0f5f2);
+  color: var(--editor-fg, var(--green));
+}
 
 .pill {
   display: inline-flex;
@@ -993,6 +1022,62 @@ tr.row-selected {
 .status-for-revision { background: var(--red-soft); color: var(--red); border-color: #ffc0c6; }
 .status-done,
 .status-paid { background: var(--green-soft); color: var(--green); border-color: #bde3ce; }
+
+body.night-mode .type-regular-edit,
+body.night-mode .status-Ongoing,
+body.night-mode .status-ongoing {
+  background: #132d4c;
+  color: #a9d2ff;
+  border-color: #24517d;
+}
+
+body.night-mode .type-long-story {
+  background: #2e2348;
+  color: #d2bdff;
+}
+
+body.night-mode .type-easy,
+body.night-mode .status-Done,
+body.night-mode .status-Paid,
+body.night-mode .status-done,
+body.night-mode .status-paid {
+  background: #17382a;
+  color: #9ff0c6;
+  border-color: #286246;
+}
+
+body.night-mode .type-hard,
+body.night-mode .status-For-Checking,
+body.night-mode .status-for-checking {
+  background: #3b2c12;
+  color: #ffd980;
+  border-color: #705722;
+}
+
+body.night-mode .type-untyped,
+body.night-mode .status-To-Do,
+body.night-mode .status-to-do,
+body.night-mode .open-slot,
+body.night-mode .editor-unassigned {
+  background: #25313f;
+  color: #c7d5e5;
+  border-color: #3b4a5c;
+}
+
+body.night-mode .status-Revision,
+body.night-mode .status-For-Revision,
+body.night-mode .status-revision,
+body.night-mode .status-for-revision {
+  background: var(--red-soft);
+  color: var(--red);
+  border-color: #75404a;
+}
+
+body.night-mode .editor-chip {
+  background: var(--editor-night-bg, #17382a);
+  color: var(--editor-night-fg, #9ff0c6);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--editor-night-fg, #9ff0c6) 28%, transparent);
+}
 
 .linkish {
   color: var(--blue);

@@ -807,8 +807,40 @@ function typeChip(project) {
   return `<span class="chip type-${chipClass(project.type)}">${project.type || "Untyped"}${duration}</span>`;
 }
 
+function editorPalette(editor) {
+  const palettes = [
+    ["#dcf4e8", "#034b2b", "#17382a", "#9ff0c6"],
+    ["#e4f0ff", "#164c8b", "#132d4c", "#a9d2ff"],
+    ["#fff0cc", "#805000", "#3b2c12", "#ffd980"],
+    ["#efe7ff", "#56349a", "#2e2348", "#d2bdff"],
+    ["#e2f7f5", "#006b64", "#143a38", "#8ee5df"],
+    ["#ffe8d7", "#8d3f05", "#422414", "#ffbd8d"],
+    ["#ffe1e4", "#b4232c", "#442127", "#ff9aa2"],
+    ["#edf2f7", "#344054", "#25313f", "#c7d5e5"],
+    ["#dff7ff", "#075985", "#123747", "#9be5ff"],
+    ["#f4e8ff", "#6b21a8", "#352042", "#dfb5ff"],
+    ["#e9fbe8", "#166534", "#183a22", "#9ff5a9"],
+    ["#fff7d6", "#854d0e", "#402d12", "#ffe28f"],
+    ["#fce7f3", "#9d174d", "#4a1730", "#f9a8d4"],
+    ["#ede9fe", "#5b21b6", "#2e224f", "#c4b5fd"],
+    ["#dcfce7", "#14532d", "#173522", "#86efac"],
+    ["#fee2e2", "#991b1b", "#461d1d", "#fca5a5"],
+    ["#e0f2fe", "#075985", "#13354a", "#7dd3fc"],
+    ["#fae8ff", "#86198f", "#3f1d45", "#f0abfc"],
+    ["#fef3c7", "#92400e", "#432915", "#fcd34d"],
+    ["#ccfbf1", "#115e59", "#123a37", "#5eead4"]
+  ];
+  const key = String(editor || "unassigned");
+  const editorIndex = editors.findIndex(name => name.toLowerCase() === key.toLowerCase());
+  if (editorIndex > -1) return palettes[editorIndex % palettes.length];
+  const total = [...key].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return palettes[total % palettes.length];
+}
+
 function editorChip(editor) {
-  return editor ? `<span class="chip editor-chip editor-${chipClass(editor)}">${editor}</span>` : `<span class="chip editor-unassigned">Unassigned</span>`;
+  if (!editor) return `<span class="chip editor-unassigned">Unassigned</span>`;
+  const [bg, fg, nightBg, nightFg] = editorPalette(editor);
+  return `<span class="chip editor-chip editor-${chipClass(editor)}" style="--editor-bg:${bg};--editor-fg:${fg};--editor-night-bg:${nightBg};--editor-night-fg:${nightFg};">${editor}</span>`;
 }
 
 function actionButton(p, editor = activeEditor, admin = false) {
@@ -871,10 +903,6 @@ function projectTable(rows, opts = {}) {
   const includeScriptRaw = opts.includeScriptRaw !== false;
   const includeDeliverable = opts.includeDeliverable !== false;
   const filteredRows = rows.filter(matchesSearch);
-  const visibleIds = new Set(filteredRows.map(p => String(p.id)));
-  [...selectedProjectIds].forEach(id => {
-    if (!visibleIds.has(id)) selectedProjectIds.delete(id);
-  });
   const selectedCount = allowBulk ? selectedProjectIds.size : 0;
   return `
     ${allowBulk ? `
@@ -1443,6 +1471,8 @@ document.addEventListener("click", async (event) => {
 
   const actionButtonEl = event.target.closest("[data-action]");
   const action = actionButtonEl?.dataset.action;
+  if (action === "mark-project") return;
+
   if (action === "take" || action === "release") {
     const p = projects.find(project => String(project.id) === actionButtonEl.dataset.id);
     if (!p || p.status === "Paid") return;
