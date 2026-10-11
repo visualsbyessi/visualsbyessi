@@ -21,11 +21,11 @@
 
 body.night-mode {
   --bg: #101715;
-  --panel: #16211d;
-  --panel-soft: #1d2a25;
-  --line: #2c3a35;
+  --panel: #1d2d27;
+  --panel-soft: #263b33;
+  --line: #3a5148;
   --text: #f6faf7;
-  --muted: #a8b7b0;
+  --muted: #becac4;
   --blue-soft: #17382a;
   --green-soft: #17382a;
   --amber-soft: #3b2c12;
@@ -83,6 +83,13 @@ body.night-mode table,
 body.night-mode input,
 body.night-mode select {
   background: var(--panel);
+}
+
+body.night-mode .card,
+body.night-mode .panel,
+body.night-mode .top-earnings {
+  border: 1px solid rgba(190, 202, 196, 0.08);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.32);
 }
 
 .login-brand {
@@ -310,7 +317,7 @@ body.night-mode input,
 body.night-mode select {
   border-color: var(--line);
   color-scheme: dark;
-  background: #111b17;
+  background: #14211c;
   color: var(--text);
 }
 
@@ -707,6 +714,10 @@ body.night-mode .theme-toggle-knob::before {
   white-space: nowrap;
 }
 
+body.night-mode .money {
+  color: #9ff0c6;
+}
+
 .panel {
   padding: 20px;
   margin-bottom: 18px;
@@ -728,6 +739,10 @@ body.night-mode .theme-toggle-knob::before {
   gap: 4px;
 }
 
+body.night-mode .segmented {
+  background: #263b33;
+}
+
 .workspace-actions {
   display: flex;
   align-items: center;
@@ -743,6 +758,10 @@ body.night-mode .theme-toggle-knob::before {
   padding: 8px 14px;
   cursor: pointer;
   color: #31415f;
+}
+
+body.night-mode .segmented button {
+  color: #dce6e1;
 }
 
 .segmented button.active {
@@ -778,7 +797,7 @@ th {
 }
 
 body.night-mode th {
-  color: #d6e0dc;
+  color: #dce6e1;
   background: var(--panel-soft);
 }
 
@@ -791,7 +810,7 @@ tbody tr:hover {
 }
 
 body.night-mode tbody tr:hover {
-  background: #1b2a24;
+  background: #243a31;
 }
 
 tr:last-child td { border-bottom: 0; }
@@ -845,12 +864,12 @@ tr.row-selected td {
 }
 
 body.night-mode tr.row-selected {
-  background: #17382a;
+  background: #244134;
   box-shadow: inset 5px 0 0 #9ff0c6;
 }
 
 body.night-mode tr.row-selected td {
-  border-bottom-color: #286246;
+  border-bottom-color: #3c6754;
 }
 
 body.night-mode .mark-project {
