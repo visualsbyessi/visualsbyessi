@@ -18,6 +18,7 @@ const DISCORD_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/discord-notify`;
 let remoteEnabled = true;
 let remotePaidAtEnabled = true;
 let remoteTrashEnabled = true;
+let remoteProjectNotesEnabled = true;
 let liveSyncRunning = false;
 const PAID_DELETE_AFTER_DAYS = 7;
 
@@ -92,6 +93,7 @@ async function loadRemoteData() {
       raw: Boolean(project.raw_link),
       scriptLink: project.script_link || "",
       rawLink: project.raw_link || "",
+      notes: project.notes || "",
       editor: project.editors?.name || "",
       status: project.status || "To Do",
       deliverable: project.deliverable_link || "",
@@ -192,6 +194,7 @@ async function saveProjectRemote(project) {
     deliverable_link: project.deliverable || null,
     duration_minutes: project.duration || null
   };
+  if (remoteProjectNotesEnabled) payload.notes = project.notes || null;
   if (remotePaidAtEnabled) payload.paid_at = project.paidAt || null;
   if (remoteTrashEnabled) {
     payload.deleted_at = project.deletedAt || null;
@@ -232,6 +235,23 @@ async function saveProjectRemote(project) {
       remoteTrashEnabled = false;
       delete payload.deleted_at;
       delete payload.deleted_by;
+      if (typeof project.id === "string" && project.id.length > 20) {
+        await supabaseRequest(`/projects?id=eq.${project.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload)
+        });
+      } else {
+        const [created] = await supabaseRequest("/projects", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        if (created?.id) project.id = created.id;
+      }
+      return;
+    }
+    if (remoteProjectNotesEnabled && String(error.message || "").includes("notes")) {
+      remoteProjectNotesEnabled = false;
+      delete payload.notes;
       if (typeof project.id === "string" && project.id.length > 20) {
         await supabaseRequest(`/projects?id=eq.${project.id}`, {
           method: "PATCH",
@@ -812,6 +832,13 @@ function typeChip(project) {
   return `<span class="chip type-${chipClass(project.type)}">${project.type || "Untyped"}${duration}</span>`;
 }
 
+function safeUrl(url = "") {
+  const clean = String(url || "").trim();
+  if (!clean) return "";
+  if (/^(https?:)?\/\//i.test(clean)) return clean;
+  return `https://${clean}`;
+}
+
 function editorPalette(editor) {
   const palettes = [
     ["#dcf4e8", "#034b2b", "#17382a", "#9ff0c6"],
@@ -868,13 +895,23 @@ function actionButton(p, editor = activeEditor, admin = false) {
   return `<div class="icon-actions"><button class="icon-action" disabled title="Locked">${icon("lock")}</button></div>`;
 }
 
-function linkCell(hasLink) {
-  return hasLink ? `<a href="#" class="linkish">${icon("file")} View</a>` : `<span class="muted">None</span>`;
+function linkCell(url) {
+  const href = safeUrl(url);
+  return href ? `<a href="${href}" class="linkish" target="_blank" rel="noopener noreferrer">${icon("file")} View</a>` : `<span class="muted">None</span>`;
 }
 
 function deliverableCell(p) {
-  if (p.status === "Paid" || p.deliverable) return `<a href="#" class="linkish">${icon("link")} ${p.deliverable || "View link"}</a>`;
-  if (p.editor) return `<input class="table-input" placeholder="Paste link" />`;
+  const href = safeUrl(p.deliverable);
+  if (href) {
+    return `
+      <span class="deliverable-tools">
+        <a href="${href}" class="linkish" target="_blank" rel="noopener noreferrer">${icon("link")} Open</a>
+        <button class="copy-link-button" data-action="copy-deliverable" data-id="${p.id}" type="button">Copy</button>
+      </span>
+    `;
+  }
+  if (p.status === "Paid") return `<span class="muted">Paid</span>`;
+  if (p.editor) return `<input class="table-input" data-action="deliverable-input" data-id="${p.id}" placeholder="Paste link" />`;
   return `<span class="muted">-</span>`;
 }
 
@@ -935,10 +972,10 @@ function projectTable(rows, opts = {}) {
           ${filteredRows.length ? filteredRows.map(p => `
             <tr class="${selectedProjectIds.has(String(p.id)) ? "row-selected" : ""}">
               ${allowBulk ? `<td class="mark-col"><input class="mark-project" type="checkbox" data-action="mark-project" data-id="${p.id}" ${selectedProjectIds.has(String(p.id)) ? "checked" : ""} ${p.status === "Paid" ? "disabled" : ""} aria-label="Mark ${p.project}" /></td>` : ""}
-              <td><strong>${p.project}</strong></td>
+              <td><strong>${p.project}</strong>${p.notes ? `<span class="project-note">${p.notes}</span>` : ""}</td>
               ${includeClient ? `<td>${p.client}</td>` : ""}
               <td>${typeChip(p)}</td>
-              ${includeScriptRaw ? `<td>${linkCell(p.script)}</td><td>${linkCell(p.raw)}</td>` : ""}
+              ${includeScriptRaw ? `<td>${linkCell(p.scriptLink)}</td><td>${linkCell(p.rawLink)}</td>` : ""}
               <td>${renderStatusSelect(p, admin)}</td>
               <td>${editorChip(p.editor)}</td>
               ${includeDeliverable ? `<td>${deliverableCell(p)}</td>` : ""}
@@ -1390,6 +1427,7 @@ function configureProjectForm(clientPreset = "") {
     editorSelect.value = editingProject.editor || "Unassigned";
     form.elements.script.value = editingProject.scriptLink || "";
     form.elements.raw.value = editingProject.rawLink || "";
+    form.elements.notes.value = editingProject.notes || "";
     form.elements.duration.value = editingProject.duration ? formatDuration(editingProject.duration) : "";
   } else if (clientPreset) {
     clientSelect.value = clientPreset;
@@ -1481,6 +1519,18 @@ document.addEventListener("click", async (event) => {
   const actionButtonEl = event.target.closest("[data-action]");
   const action = actionButtonEl?.dataset.action;
   if (action === "mark-project") return;
+
+  if (action === "copy-deliverable") {
+    const project = projects.find(item => String(item.id) === actionButtonEl.dataset.id);
+    const href = safeUrl(project?.deliverable);
+    if (!href) return;
+    await navigator.clipboard.writeText(href);
+    actionButtonEl.textContent = "Copied";
+    setTimeout(() => {
+      actionButtonEl.textContent = "Copy";
+    }, 1200);
+    return;
+  }
 
   if (action === "take" || action === "release") {
     const p = projects.find(project => String(project.id) === actionButtonEl.dataset.id);
@@ -1688,6 +1738,15 @@ document.addEventListener("change", async (event) => {
     renderAll();
     setView("dashboard");
   }
+
+  if (event.target.dataset.action === "deliverable-input") {
+    const project = projects.find(item => String(item.id) === event.target.dataset.id);
+    if (!project) return;
+    project.deliverable = event.target.value.trim();
+    await saveProjectRemote(project);
+    renderAll();
+    setView(currentView);
+  }
 });
 
 document.addEventListener("input", (event) => {
@@ -1816,6 +1875,7 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
     raw: !isAdmin() || isNicolasProject ? false : Boolean(data.raw),
     scriptLink: !isAdmin() || isNicolasProject ? "" : data.script,
     rawLink: !isAdmin() || isNicolasProject ? "" : data.raw,
+    notes: data.notes || "",
     duration: selectedClient === "Deniss" && data.type === "Long Story" ? parseDuration(data.duration) : 0,
     editor: !isAdmin() ? currentUser : data.editor === "Unassigned" ? "" : data.editor
   });
