@@ -627,6 +627,7 @@ function isDuplicateProject(candidate, ignoreId = "") {
 function invoiceAmount(project) {
   if (project.client === "Deniss") {
     if (project.type === "Long Story") return Math.ceil((project.duration || 2) / 2) * 25;
+    if (project.type === "Translation") return 15;
     return 20;
   }
   if (project.client === "Nicolas") return project.type === "Hard" ? 20 : 15;
@@ -634,7 +635,11 @@ function invoiceAmount(project) {
 }
 
 function invoiceRate(project) {
-  if (project.client === "Deniss") return project.type === "Long Story" ? "$25 per 2 min" : "$20/video";
+  if (project.client === "Deniss") {
+    if (project.type === "Long Story") return "$25 per 2 min";
+    if (project.type === "Translation") return "$15/video";
+    return "$20/video";
+  }
   if (project.client === "Nicolas") return project.type === "Hard" ? "$20/video" : "$15/video";
   return "-";
 }
@@ -1007,7 +1012,7 @@ function renderDashboard() {
   const invoiceRows = billable.filter(p => dashboardInvoiceFilter === "all" || p.client === dashboardInvoiceFilter);
   const invoiceCardClass = client => dashboardBreakdownMode === "invoice" && dashboardInvoiceFilter === client ? " active-filter" : "";
   const payoutCardClass = dashboardBreakdownMode === "payout" ? " active-filter" : "";
-  const typeSummary = ["Regular Edit", "Long Story", "Easy", "Hard"]
+  const typeSummary = ["Regular Edit", "Long Story", "Translation", "Easy", "Hard"]
     .map(type => ({ type, count: invoiceRows.filter(project => project.type === type).length }))
     .filter(item => item.count > 0);
   const payoutRows = payable.filter(project => project.editor);
@@ -1372,7 +1377,9 @@ function configureProjectForm(clientPreset = "") {
   });
   [...typeSelect.options].forEach(option => {
     const nicolasType = ["Easy", "Hard"].includes(option.value);
-    option.disabled = isNicolasProject ? !nicolasType : nicolasType;
+    const denissType = ["Regular Edit", "Long Story", "Translation"].includes(option.value);
+    const mehdiType = option.value === "Regular Edit";
+    option.disabled = isNicolasProject ? !nicolasType : selectedClient === "Deniss" ? !denissType : !mehdiType;
     option.hidden = !isAdmin() && isNicolasProject ? !nicolasType : false;
   });
 
@@ -1392,7 +1399,8 @@ function configureProjectForm(clientPreset = "") {
     editorSelect.value = currentUser;
   }
   if (isNicolasProject && !["Easy", "Hard"].includes(typeSelect.value)) typeSelect.value = "Easy";
-  if (!isNicolasProject && ["Easy", "Hard"].includes(typeSelect.value)) typeSelect.value = "Regular Edit";
+  if (selectedClient === "Deniss" && !["Regular Edit", "Long Story", "Translation"].includes(typeSelect.value)) typeSelect.value = "Regular Edit";
+  if (selectedClient === "Mehdi" && typeSelect.value !== "Regular Edit") typeSelect.value = "Regular Edit";
   if (![...editorSelect.options].some(option => option.value === editorSelect.value && !option.disabled)) {
     editorSelect.value = isAdmin() ? "Unassigned" : currentUser;
   }
@@ -1789,6 +1797,8 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
   const selectedClient = !isAdmin() ? "Nicolas" : data.client;
   const isNicolasProject = selectedClient === "Nicolas";
   if (isNicolasProject && !["Easy", "Hard"].includes(data.type)) return;
+  if (selectedClient === "Deniss" && !["Regular Edit", "Long Story", "Translation"].includes(data.type)) return;
+  if (selectedClient === "Mehdi" && data.type !== "Regular Edit") return;
   if (!isNicolasProject && ["Easy", "Hard"].includes(data.type)) return;
   const existingProject = projects.find(item => String(item.id) === String(editingProjectId));
   const previousEditor = existingProject?.editor || "";

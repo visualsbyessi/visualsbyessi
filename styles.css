@@ -971,6 +971,7 @@ body.night-mode .mark-project {
 
 .type-regular-edit { background: #e8f2ff; color: #185a9d; }
 .type-long-story { background: #efe7ff; color: #6040a8; }
+.type-translation { background: #e2f7f5; color: #006b64; }
 .type-easy { background: #e5f4ec; color: var(--green); }
 .type-hard { background: #fff0cc; color: #986100; }
 .type-untyped { background: #edf2f7; color: #526175; }
@@ -1053,6 +1054,11 @@ body.night-mode .status-ongoing {
 body.night-mode .type-long-story {
   background: #2e2348;
   color: #d2bdff;
+}
+
+body.night-mode .type-translation {
+  background: #143a38;
+  color: #8ee5df;
 }
 
 body.night-mode .type-easy,
