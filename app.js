@@ -125,8 +125,12 @@ function formIsOpen() {
   return Boolean(document.querySelector(".modal.open"));
 }
 
+function deliverableInputIsActive() {
+  return Boolean(document.activeElement?.matches("[data-action='deliverable-input']"));
+}
+
 async function liveSyncRemoteData() {
-  if (!remoteEnabled || liveSyncRunning || formIsOpen() || !currentUser) return;
+  if (!remoteEnabled || liveSyncRunning || formIsOpen() || deliverableInputIsActive() || !currentUser) return;
   liveSyncRunning = true;
   try {
     await loadRemoteData();
@@ -913,6 +917,17 @@ function deliverableCell(p) {
   if (p.status === "Paid") return `<span class="muted">Paid</span>`;
   if (p.editor) return `<input class="table-input" data-action="deliverable-input" data-id="${p.id}" placeholder="Paste link" />`;
   return `<span class="muted">-</span>`;
+}
+
+async function saveDeliverableInput(input) {
+  const project = projects.find(item => String(item.id) === input.dataset.id);
+  if (!project) return;
+  const nextLink = input.value.trim();
+  if (!nextLink) return;
+  project.deliverable = nextLink;
+  await saveProjectRemote(project);
+  renderAll();
+  setView(currentView);
 }
 
 function renderStatusSelect(p, admin = false) {
@@ -1740,13 +1755,19 @@ document.addEventListener("change", async (event) => {
   }
 
   if (event.target.dataset.action === "deliverable-input") {
-    const project = projects.find(item => String(item.id) === event.target.dataset.id);
-    if (!project) return;
-    project.deliverable = event.target.value.trim();
-    await saveProjectRemote(project);
-    renderAll();
-    setView(currentView);
+    await saveDeliverableInput(event.target);
   }
+});
+
+document.addEventListener("paste", (event) => {
+  if (event.target.dataset.action !== "deliverable-input") return;
+  setTimeout(() => saveDeliverableInput(event.target), 0);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.target.dataset.action !== "deliverable-input" || event.key !== "Enter") return;
+  event.preventDefault();
+  saveDeliverableInput(event.target);
 });
 
 document.addEventListener("input", (event) => {
