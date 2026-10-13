@@ -1543,6 +1543,14 @@ function deliverablePreviewSource(url) {
   const href = safeUrl(url);
   if (!href) return { href: "", type: "" };
 
+  const driveFolderId = href.match(/drive\.google\.com\/(?:drive\/(?:u\/\d+\/)?folders\/|embeddedfolderview\?id=)([^/?&#]+)/i)?.[1];
+  if (driveFolderId) {
+    return {
+      href: `https://drive.google.com/embeddedfolderview?id=${driveFolderId}#grid`,
+      type: "folder"
+    };
+  }
+
   const driveId = href.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([^/?&#]+)/i)?.[1];
   if (driveId) return { href: `https://drive.google.com/file/d/${driveId}/preview`, type: "frame" };
 
@@ -1562,6 +1570,9 @@ function openDeliverablePreview(projectId) {
   const stage = document.querySelector("#deliverablePreviewStage");
   document.querySelector("#deliverablePreviewTitle").textContent = project.project || "Deliverable preview";
   document.querySelector("#deliverablePreviewMeta").textContent = [project.client, project.editor].filter(Boolean).join(" · ");
+  document.querySelector("#deliverablePreviewNote").textContent = source.type === "folder"
+    ? "Open folders here until you find the video, then select it to preview."
+    : "Use the player controls for volume, playback, and fullscreen.";
   stage.innerHTML = source.type === "video"
     ? `<video src="${escapeAttr(source.href)}" controls autoplay playsinline></video>`
     : `<iframe src="${escapeAttr(source.href)}" title="${escapeAttr(project.project || "Deliverable preview")}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
