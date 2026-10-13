@@ -904,24 +904,32 @@ function linkCell(url) {
   return href ? `<a href="${href}" class="linkish" target="_blank" rel="noopener noreferrer">${icon("file")} View</a>` : `<span class="muted">None</span>`;
 }
 
+function escapeAttr(value = "") {
+  return String(value).replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+
+function canEditDeliverable(p) {
+  return isAdmin() || (p.editor === currentUser && p.status !== "Paid" && !p.paidAt);
+}
+
 function deliverableCell(p) {
   const href = safeUrl(p.deliverable);
-  if (href) {
+  if (href || (p.editor && canEditDeliverable(p))) {
     return `
       <span class="deliverable-tools">
-        <a href="${href}" class="linkish" target="_blank" rel="noopener noreferrer">${icon("link")} Open</a>
-        <button class="copy-link-button" data-action="copy-deliverable" data-id="${p.id}" type="button">Copy</button>
+        ${canEditDeliverable(p) ? `<input class="table-input" data-action="deliverable-input" data-id="${p.id}" placeholder="Paste link" aria-label="Deliverable link" value="${escapeAttr(p.deliverable || "")}" />` : ""}
+        ${href ? `<a href="${escapeAttr(href)}" class="linkish" target="_blank" rel="noopener noreferrer">${icon("link")} Open</a>
+        <button class="copy-link-button" data-action="copy-deliverable" data-id="${p.id}" type="button">Copy</button>` : ""}
       </span>
     `;
   }
   if (p.status === "Paid") return `<span class="muted">Paid</span>`;
-  if (p.editor) return `<input class="table-input" data-action="deliverable-input" data-id="${p.id}" placeholder="Paste link" />`;
   return `<span class="muted">-</span>`;
 }
 
 async function saveDeliverableInput(input) {
   const project = projects.find(item => String(item.id) === input.dataset.id);
-  if (!project) return;
+  if (!project || !canEditDeliverable(project)) return;
   const nextLink = input.value.trim();
   if (!nextLink) return;
   project.deliverable = nextLink;
