@@ -1141,6 +1141,14 @@ body.night-mode .editor-chip {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.linkish-button {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
 }
 
 .copy-link-button {
@@ -1424,6 +1432,95 @@ body.night-mode .editor-chip {
 
 .modal.open { display: flex; }
 
+body.preview-open {
+  overflow: hidden;
+}
+
+.deliverable-preview-modal {
+  background: rgba(7, 12, 10, 0.74);
+  backdrop-filter: blur(18px);
+  padding: 28px;
+}
+
+.deliverable-preview-panel {
+  width: min(1120px, 94vw);
+  max-height: 92vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 16px;
+  color: #f7faf8;
+  background: #202522;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+}
+
+.deliverable-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-width: 0;
+}
+
+.deliverable-preview-header h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 20px;
+}
+
+.deliverable-preview-header p,
+.deliverable-preview-note {
+  margin: 4px 0 0;
+  color: #bdc8c1;
+  font-size: 13px;
+}
+
+.preview-close-button {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.preview-close-button:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.deliverable-preview-stage {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 260px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #000;
+}
+
+.deliverable-preview-stage video,
+.deliverable-preview-stage iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+}
+
+.deliverable-preview-stage video {
+  object-fit: contain;
+}
+
+.deliverable-preview-note {
+  margin: 0;
+  text-align: center;
+}
+
 .modal-panel {
   width: min(720px, 100%);
   background: #fff;
@@ -1496,4 +1593,10 @@ label {
   }
   .cards, .workspace-summary, .quick-links, .two-col { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .deliverable-preview-modal { padding: 10px; }
+  .deliverable-preview-panel { width: 100%; padding: 12px; }
+  .deliverable-preview-stage { min-height: 190px; }
 }

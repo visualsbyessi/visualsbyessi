@@ -918,7 +918,7 @@ function deliverableCell(p) {
     return `
       <span class="deliverable-tools">
         ${canEditDeliverable(p) ? `<input class="table-input" data-action="deliverable-input" data-id="${p.id}" placeholder="Paste link" aria-label="Deliverable link" value="${escapeAttr(p.deliverable || "")}" />` : ""}
-        ${href ? `<a href="${escapeAttr(href)}" class="linkish" target="_blank" rel="noopener noreferrer">${icon("link")} Open</a>
+        ${href ? `<button class="linkish linkish-button" data-action="preview-deliverable" data-id="${p.id}" type="button">${icon("eye")} Preview</button>
         <button class="copy-link-button" data-action="copy-deliverable" data-id="${p.id}" type="button">Copy</button>` : ""}
       </span>
     `;
@@ -1535,6 +1535,46 @@ function closeLinkModal() {
   document.querySelector("#linkModal").classList.remove("open");
 }
 
+function deliverablePreviewSource(url) {
+  const href = safeUrl(url);
+  if (!href) return { href: "", type: "" };
+
+  const driveId = href.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([^/?&#]+)/i)?.[1];
+  if (driveId) return { href: `https://drive.google.com/file/d/${driveId}/preview`, type: "frame" };
+
+  const youtubeId = href.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^?&#/]+)/i)?.[1];
+  if (youtubeId) return { href: `https://www.youtube.com/embed/${youtubeId}`, type: "frame" };
+
+  if (/\.(mp4|webm|ogg|mov|m4v)(?:[?#].*)?$/i.test(href)) return { href, type: "video" };
+  return { href, type: "frame" };
+}
+
+function openDeliverablePreview(projectId) {
+  const project = projects.find(item => String(item.id) === String(projectId));
+  const source = deliverablePreviewSource(project?.deliverable);
+  if (!project || !source.href) return;
+
+  const modal = document.querySelector("#deliverablePreviewModal");
+  const stage = document.querySelector("#deliverablePreviewStage");
+  document.querySelector("#deliverablePreviewTitle").textContent = project.project || "Deliverable preview";
+  document.querySelector("#deliverablePreviewMeta").textContent = [project.client, project.editor].filter(Boolean).join(" · ");
+  stage.innerHTML = source.type === "video"
+    ? `<video src="${escapeAttr(source.href)}" controls autoplay playsinline></video>`
+    : `<iframe src="${escapeAttr(source.href)}" title="${escapeAttr(project.project || "Deliverable preview")}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("preview-open");
+}
+
+function closeDeliverablePreview() {
+  const modal = document.querySelector("#deliverablePreviewModal");
+  if (!modal) return;
+  modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
+  document.querySelector("#deliverablePreviewStage").innerHTML = "";
+  document.body.classList.remove("preview-open");
+}
+
 document.addEventListener("click", async (event) => {
   const nav = event.target.closest(".nav-item");
   if (nav) setView(nav.dataset.view);
@@ -1542,6 +1582,11 @@ document.addEventListener("click", async (event) => {
   const actionButtonEl = event.target.closest("[data-action]");
   const action = actionButtonEl?.dataset.action;
   if (action === "mark-project") return;
+
+  if (action === "preview-deliverable") {
+    openDeliverablePreview(actionButtonEl.dataset.id);
+    return;
+  }
 
   if (action === "copy-deliverable") {
     const project = projects.find(item => String(item.id) === actionButtonEl.dataset.id);
@@ -1773,6 +1818,10 @@ document.addEventListener("paste", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && document.querySelector("#deliverablePreviewModal")?.classList.contains("open")) {
+    closeDeliverablePreview();
+    return;
+  }
   if (event.target.dataset.action !== "deliverable-input" || event.key !== "Enter") return;
   event.preventDefault();
   saveDeliverableInput(event.target);
@@ -1799,6 +1848,10 @@ document.querySelector("#closeEditorModal").onclick = closeEditorModal;
 document.querySelector("#cancelEditorModal").onclick = closeEditorModal;
 document.querySelector("#closeLinkModal").onclick = closeLinkModal;
 document.querySelector("#cancelLinkModal").onclick = closeLinkModal;
+document.querySelector("#closeDeliverablePreview").onclick = closeDeliverablePreview;
+document.querySelector("#deliverablePreviewModal").addEventListener("click", event => {
+  if (event.target.id === "deliverablePreviewModal") closeDeliverablePreview();
+});
 document.querySelector("#logoutButton").onclick = endSession;
 document.querySelector("#themeToggle").onclick = () => applyTheme(currentTheme === "night" ? "day" : "night");
 document.querySelector("#toggleLoginPassword").onclick = () => {
