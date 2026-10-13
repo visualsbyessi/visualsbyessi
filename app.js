@@ -1197,9 +1197,13 @@ function renderClientPage(id, title, rows) {
 }
 
 function renderWorkspace(editor = activeEditor, target = "#view-workspace") {
-  const rows = activeProjects().filter(p => p.editor === editor || (!p.editor && allowedEditors(p.client).includes(editor)));
+  const clientRows = activeProjects().filter(p => allowedEditors(p.client).includes(editor));
   const addNicolas = canCreateNicolasProject(editor) && target === "#view-workspace";
-  const modeRows = workspaceMode === "all" ? rows : workspaceMode === "available" ? rows.filter(p => !p.editor) : rows.filter(p => p.editor === editor);
+  const modeRows = workspaceMode === "all"
+    ? clientRows
+    : workspaceMode === "available"
+      ? clientRows.filter(p => !p.editor)
+      : clientRows.filter(p => p.editor === editor);
   const visibleRows = filterRowsByStatus(modeRows, workspaceStatusFilter);
   const nicolasOnly = visibleRows.length > 0 && visibleRows.every(p => p.client === "Nicolas");
   document.querySelector(target).innerHTML = `
