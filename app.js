@@ -514,7 +514,7 @@ let editingLinkId = null;
 let draggingQuickLinkGroup = "";
 const selectedProjectIds = new Set();
 let nextId = 15;
-const defaultNavOrder = ["dashboard", "md", "nicolas", "editors", "workspace", "links", "trash", "viewas"];
+const defaultNavOrder = ["dashboard", "md", "nicolas", "editors", "workspace", "voiceover", "links", "trash", "viewas"];
 let currentTheme = localStorage.getItem("visualsByEssiTheme") || "day";
 
 const projects = [
@@ -1281,6 +1281,27 @@ function renderLinks() {
   initQuickLinkDrag();
 }
 
+function renderVoiceover() {
+  document.querySelector("#view-voiceover").innerHTML = `
+    <section class="voiceover-panel">
+      <div class="voiceover-header">
+        <div>
+          <p class="eyebrow">Automation</p>
+          <h2>Voiceover Automation</h2>
+          <p class="muted">Generate translated MP3 voiceovers from ad videos, approved scripts, and B-roll sync modes.</p>
+        </div>
+        <a class="soft-button" href="https://translation-fb9z.onrender.com/" target="_blank" rel="noopener">Open in new tab</a>
+      </div>
+      <iframe
+        class="voiceover-frame"
+        title="Voiceover Automation"
+        src="https://translation-fb9z.onrender.com/"
+        loading="lazy"
+      ></iframe>
+    </section>
+  `;
+}
+
 function renderEditors() {
   document.querySelector("#view-editors").innerHTML = `
     <div class="panel">
@@ -1371,18 +1392,19 @@ function renderAll() {
   renderClientPage("#view-nicolas", "Nicolas Workspace", active.filter(p => p.client === "Nicolas"));
   renderEditors();
   renderWorkspace(currentUser || "Essi", "#view-workspace");
+  renderVoiceover();
   renderLinks();
   renderTrash();
   renderViewAs();
 }
 
 function setView(view) {
-  if (!isAdmin() && !["workspace", "links", "trash"].includes(view)) view = "workspace";
+  if (!isAdmin() && !["workspace", "voiceover", "links", "trash"].includes(view)) view = "workspace";
   currentView = view;
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active-view"));
   document.querySelector(`#view-${view}`).classList.add("active-view");
   document.querySelectorAll(".nav-item").forEach(item => item.classList.toggle("active", item.dataset.view === view));
-  const labels = { dashboard: "Dashboard", md: "Mehdi & Deniss", nicolas: "Nicolas", editors: "Editors", workspace: `${currentUser || "Essi"} Workspace`, links: "Quick Links", trash: "Trash", viewas: "View As Editor" };
+  const labels = { dashboard: "Dashboard", md: "Mehdi & Deniss", nicolas: "Nicolas", editors: "Editors", workspace: `${currentUser || "Essi"} Workspace`, voiceover: "Voiceover Automation", links: "Quick Links", trash: "Trash", viewas: "View As Editor" };
   document.querySelector("#page-title").textContent = labels[view];
   updateTopbar(view);
 }
