@@ -131,6 +131,7 @@ function deliverableInputIsActive() {
 
 async function liveSyncRemoteData() {
   if (!remoteEnabled || liveSyncRunning || formIsOpen() || deliverableInputIsActive() || !currentUser) return;
+  if (currentView === "voiceover") return;
   liveSyncRunning = true;
   try {
     await loadRemoteData();
@@ -1282,16 +1283,9 @@ function renderLinks() {
 }
 
 function renderVoiceover() {
+  if (document.querySelector("#view-voiceover .voiceover-frame")) return;
   document.querySelector("#view-voiceover").innerHTML = `
     <section class="voiceover-panel">
-      <div class="voiceover-header">
-        <div>
-          <p class="eyebrow">Automation</p>
-          <h2>Voiceover Automation</h2>
-          <p class="muted">Generate translated MP3 voiceovers from ad videos, approved scripts, and B-roll sync modes.</p>
-        </div>
-        <a class="soft-button" href="https://translation-fb9z.onrender.com/" target="_blank" rel="noopener">Open in new tab</a>
-      </div>
       <iframe
         class="voiceover-frame"
         title="Voiceover Automation"
