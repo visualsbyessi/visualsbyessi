@@ -1589,11 +1589,13 @@ function configureEmbeddedInvoice(frame) {
     const fontSelect = invoiceDocument?.querySelector("#invoiceFont");
     if (styleSelect) {
       styleSelect.value = "modern";
-      styleSelect.closest(".field")?.setAttribute("hidden", "");
+      const styleField = styleSelect.closest(".field");
+      if (styleField) styleField.style.display = "none";
     }
     if (fontSelect) {
       fontSelect.value = "'Space Mono', monospace";
-      fontSelect.closest(".field")?.setAttribute("hidden", "");
+      const fontField = fontSelect.closest(".field");
+      if (fontField) fontField.style.display = "none";
     }
     invoiceWindow?.renderPreview?.();
   } catch (error) {
