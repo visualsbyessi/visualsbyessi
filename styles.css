@@ -1725,7 +1725,7 @@ body:has(.modal.open) {
   height: calc(100vh - 218px);
   width: auto;
   max-width: 100%;
-  aspect-ratio: 210 / 297;
+  aspect-ratio: 8.5 / 11;
   min-height: 0;
   margin: 0 auto;
   padding: clamp(24px, 3.2vw, 48px) clamp(25px, 3.4vw, 52px);
@@ -1762,6 +1762,12 @@ body:has(.modal.open) {
 .modern-invoice-paper td { padding: 9px 4px; border-bottom: 1px dotted #aaa; text-align: left; }
 .modern-invoice-paper th:not(:first-child),
 .modern-invoice-paper td:not(:first-child) { text-align: right; }
+.modern-invoice-paper th:nth-child(2),
+.modern-invoice-paper td:nth-child(2) { width: 18%; white-space: nowrap; }
+.modern-invoice-paper th:nth-child(3),
+.modern-invoice-paper td:nth-child(3) { width: 12%; white-space: nowrap; }
+.modern-invoice-paper th:nth-child(4),
+.modern-invoice-paper td:nth-child(4) { width: 18%; white-space: nowrap; }
 .modern-invoice-total { display: flex; justify-content: space-between; margin-top: 8px; padding: 12px 14px; background: #d9602f; color: #fff; font-weight: 800; }
 .modern-invoice-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: auto; padding-top: 40px; }
 .modern-invoice-bottom > div { display: grid; gap: 4px; }
