@@ -1683,6 +1683,9 @@ body:has(.modal.open) {
 .native-invoice-form,
 .native-invoice-preview-panel { padding: 22px; min-width: 0; height: 100%; }
 .native-invoice-form { overflow-y: auto; overflow-x: hidden; }
+.native-invoice-form .maker-form { gap: 12px; }
+.native-invoice-form .form-grid { gap: 10px 12px; }
+.native-invoice-form textarea { min-height: 58px; }
 .native-invoice-preview-panel { overflow: hidden; display: flex; flex-direction: column; }
 .native-invoice-preview-panel .panel-header { flex: 0 0 auto; }
 .native-invoice-form label { color: var(--text); min-width: 0; }
@@ -1692,7 +1695,7 @@ body:has(.modal.open) {
 .native-invoice-form input::placeholder,
 .native-invoice-form textarea::placeholder { color: var(--muted); opacity: 1; }
 .invoice-section-title {
-  margin-top: 8px;
+  margin: 4px 0 -2px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
@@ -1722,7 +1725,7 @@ body:has(.modal.open) {
   height: calc(100vh - 218px);
   width: auto;
   max-width: 100%;
-  aspect-ratio: 8.5 / 11;
+  aspect-ratio: 210 / 297;
   min-height: 0;
   margin: 0 auto;
   padding: clamp(24px, 3.2vw, 48px) clamp(25px, 3.4vw, 52px);
@@ -1742,7 +1745,7 @@ body:has(.modal.open) {
 .modern-invoice-head b,
 .modern-invoice-client span,
 .modern-invoice-bottom span { font-size: 10px; letter-spacing: .08em; }
-.modern-invoice-client { display: grid; gap: 5px; margin: 0; }
+.modern-invoice-client { display: grid; gap: 3px; margin: 0; }
 .modern-invoice-client span,
 .modern-invoice-bottom span { color: #d9602f; font-weight: 800; }
 .modern-invoice-client small,
@@ -1760,8 +1763,8 @@ body:has(.modal.open) {
 .modern-invoice-paper th:not(:first-child),
 .modern-invoice-paper td:not(:first-child) { text-align: right; }
 .modern-invoice-total { display: flex; justify-content: space-between; margin-top: 8px; padding: 12px 14px; background: #d9602f; color: #fff; font-weight: 800; }
-.modern-invoice-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; margin-top: auto; padding-top: clamp(70px, 13vh, 150px); }
-.modern-invoice-bottom > div { display: grid; gap: 7px; }
+.modern-invoice-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: auto; padding-top: 40px; }
+.modern-invoice-bottom > div { display: grid; gap: 4px; }
 .modern-invoice-wordmark { margin-top: 28px; color: #d9602f; font-size: clamp(36px, 4vw, 64px); font-weight: 800; letter-spacing: -.08em; }
 body.night-mode .native-invoice-preview-panel { background: var(--panel-soft); }
 body.night-mode .native-invoice-form label,
