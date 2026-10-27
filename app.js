@@ -1582,44 +1582,16 @@ function invoiceTotal(invoice) {
 }
 
 function renderInvoices() {
-  const today = new Date().toISOString().slice(0, 10);
   document.querySelector("#view-invoices").innerHTML = `
-    <div class="maker-layout">
-      <section class="panel maker-form-panel">
-        <div class="panel-header"><h2>New Invoice</h2></div>
-        <form id="invoiceMakerForm" class="maker-form">
-          <div class="form-grid">
-            <label>Invoice number<input name="number" required value="INV-${String(invoices.length + 1).padStart(4, "0")}" /></label>
-            <label>Client<select name="client" required><option value="">Select client</option>${documentClientsOptions()}</select></label>
-            <label>Issue date<input name="issueDate" type="date" required value="${today}" /></label>
-            <label>Due date<input name="dueDate" type="date" required value="${today}" /></label>
-            <label class="form-wide">Line items<textarea name="items" required placeholder="Video editing | 2 | 20"></textarea></label>
-            <label>Tax (%)<input name="tax" type="number" min="0" step="0.01" value="0" /></label>
-            <label>Discount ($)<input name="discount" type="number" min="0" step="0.01" value="0" /></label>
-            <label class="form-wide">Notes<textarea name="notes" placeholder="Payment details and notes"></textarea></label>
-          </div>
-          <button class="primary-button" type="submit">Save Invoice</button>
-        </form>
-      </section>
-      <section class="panel maker-library">
-        <div class="panel-header"><h2>Invoices</h2><span class="muted">${invoices.length} saved</span></div>
-        <div class="document-list">
-          ${invoices.length ? invoices.map(invoice => {
-            const totals = invoiceTotal(invoice);
-            return `<article class="document-row"><div><strong>${escapeAttr(invoice.number)}</strong><span>${escapeAttr(invoice.client)} · ${escapeAttr(invoice.issueDate)}</span></div><strong>$${totals.total.toFixed(2)}</strong><div class="row-actions"><button class="ghost-button" data-action="print-invoice" data-id="${invoice.id}">Print / PDF</button><button class="danger-button" data-action="delete-invoice" data-id="${invoice.id}">Delete</button></div></article>`;
-          }).join("") : `<div class="empty-state"><strong>No invoices yet</strong></div>`}
-        </div>
-      </section>
+    <div class="invoice-embed-shell">
+      <iframe
+        class="invoice-embed"
+        src="https://visualsbyessi.github.io/invoice/"
+        title="Modern Invoice Maker"
+        loading="eager"
+        referrerpolicy="strict-origin-when-cross-origin"
+      ></iframe>
     </div>`;
-  document.querySelector("#invoiceMakerForm").onsubmit = event => {
-    event.preventDefault();
-    const data = Object.fromEntries(new FormData(event.currentTarget).entries());
-    const items = parseInvoiceItems(data.items);
-    if (!items.length) return alert("Add at least one invoice item.");
-    invoices.unshift({ id: crypto.randomUUID(), ...data, items, tax: Number(data.tax || 0), discount: Number(data.discount || 0) });
-    localStorage.setItem("vbeInvoices", JSON.stringify(invoices));
-    renderInvoices();
-  };
 }
 
 function renderContracts() {
