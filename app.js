@@ -580,10 +580,12 @@ let editingProjectId = null;
 let editingLinkId = null;
 let editingClientId = null;
 let detailsProjectId = null;
+let invoices = JSON.parse(localStorage.getItem("vbeInvoices") || "[]");
+let contracts = JSON.parse(localStorage.getItem("vbeContracts") || "[]");
 let draggingQuickLinkGroup = "";
 const selectedProjectIds = new Set();
 let nextId = 15;
-const defaultNavOrder = ["dashboard", "clients", "editors", "workspace", "links", "trash", "viewas"];
+const defaultNavOrder = ["dashboard", "clients", "invoices", "contracts", "editors", "workspace", "links", "trash", "viewas"];
 let currentTheme = localStorage.getItem("visualsByEssiTheme") || "day";
 
 const projects = [
@@ -1562,9 +1564,111 @@ function renderTrash() {
   `;
 }
 
+function documentClientsOptions(selected = "") {
+  return clients.map(client => `<option value="${escapeAttr(client.name)}"${selected === client.name ? " selected" : ""}>${escapeAttr(client.name)}</option>`).join("");
+}
+
+function parseInvoiceItems(value = "") {
+  return String(value).split("\n").map(line => {
+    const [description, quantity = "1", rate = "0"] = line.split("|").map(part => part.trim());
+    return { description, quantity: Math.max(Number(quantity || 1), 0), rate: Math.max(Number(rate || 0), 0) };
+  }).filter(item => item.description);
+}
+
+function invoiceTotal(invoice) {
+  const subtotal = invoice.items.reduce((sum, item) => sum + item.quantity * item.rate, 0);
+  const tax = subtotal * (Number(invoice.tax || 0) / 100);
+  return { subtotal, tax, total: subtotal + tax - Number(invoice.discount || 0) };
+}
+
+function renderInvoices() {
+  const today = new Date().toISOString().slice(0, 10);
+  document.querySelector("#view-invoices").innerHTML = `
+    <div class="maker-layout">
+      <section class="panel maker-form-panel">
+        <div class="panel-header"><h2>New Invoice</h2></div>
+        <form id="invoiceMakerForm" class="maker-form">
+          <div class="form-grid">
+            <label>Invoice number<input name="number" required value="INV-${String(invoices.length + 1).padStart(4, "0")}" /></label>
+            <label>Client<select name="client" required><option value="">Select client</option>${documentClientsOptions()}</select></label>
+            <label>Issue date<input name="issueDate" type="date" required value="${today}" /></label>
+            <label>Due date<input name="dueDate" type="date" required value="${today}" /></label>
+            <label class="form-wide">Line items<textarea name="items" required placeholder="Video editing | 2 | 20"></textarea></label>
+            <label>Tax (%)<input name="tax" type="number" min="0" step="0.01" value="0" /></label>
+            <label>Discount ($)<input name="discount" type="number" min="0" step="0.01" value="0" /></label>
+            <label class="form-wide">Notes<textarea name="notes" placeholder="Payment details and notes"></textarea></label>
+          </div>
+          <button class="primary-button" type="submit">Save Invoice</button>
+        </form>
+      </section>
+      <section class="panel maker-library">
+        <div class="panel-header"><h2>Invoices</h2><span class="muted">${invoices.length} saved</span></div>
+        <div class="document-list">
+          ${invoices.length ? invoices.map(invoice => {
+            const totals = invoiceTotal(invoice);
+            return `<article class="document-row"><div><strong>${escapeAttr(invoice.number)}</strong><span>${escapeAttr(invoice.client)} · ${escapeAttr(invoice.issueDate)}</span></div><strong>$${totals.total.toFixed(2)}</strong><div class="row-actions"><button class="ghost-button" data-action="print-invoice" data-id="${invoice.id}">Print / PDF</button><button class="danger-button" data-action="delete-invoice" data-id="${invoice.id}">Delete</button></div></article>`;
+          }).join("") : `<div class="empty-state"><strong>No invoices yet</strong></div>`}
+        </div>
+      </section>
+    </div>`;
+  document.querySelector("#invoiceMakerForm").onsubmit = event => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget).entries());
+    const items = parseInvoiceItems(data.items);
+    if (!items.length) return alert("Add at least one invoice item.");
+    invoices.unshift({ id: crypto.randomUUID(), ...data, items, tax: Number(data.tax || 0), discount: Number(data.discount || 0) });
+    localStorage.setItem("vbeInvoices", JSON.stringify(invoices));
+    renderInvoices();
+  };
+}
+
+function renderContracts() {
+  const today = new Date().toISOString().slice(0, 10);
+  document.querySelector("#view-contracts").innerHTML = `
+    <div class="maker-layout">
+      <section class="panel maker-form-panel">
+        <div class="panel-header"><h2>New Contract</h2></div>
+        <form id="contractMakerForm" class="maker-form">
+          <div class="form-grid">
+            <label>Contract title<input name="title" required placeholder="Video Editing Agreement" /></label>
+            <label>Client<select name="client" required><option value="">Select client</option>${documentClientsOptions()}</select></label>
+            <label>Effective date<input name="effectiveDate" type="date" required value="${today}" /></label>
+            <label>Service fee<input name="fee" required placeholder="$500 per month" /></label>
+            <label class="form-wide">Scope of work<textarea name="scope" required placeholder="Editing services, deliverables, and turnaround"></textarea></label>
+            <label class="form-wide">Payment terms<textarea name="paymentTerms" required placeholder="Payment schedule and accepted method"></textarea></label>
+            <label class="form-wide">Additional terms<textarea name="terms" placeholder="Revisions, confidentiality, ownership, and termination"></textarea></label>
+          </div>
+          <button class="primary-button" type="submit">Save Contract</button>
+        </form>
+      </section>
+      <section class="panel maker-library">
+        <div class="panel-header"><h2>Contracts</h2><span class="muted">${contracts.length} saved</span></div>
+        <div class="document-list">
+          ${contracts.length ? contracts.map(contract => `<article class="document-row"><div><strong>${escapeAttr(contract.title)}</strong><span>${escapeAttr(contract.client)} · ${escapeAttr(contract.effectiveDate)}</span></div><span>${escapeAttr(contract.fee)}</span><div class="row-actions"><button class="ghost-button" data-action="print-contract" data-id="${contract.id}">Print / PDF</button><button class="danger-button" data-action="delete-contract" data-id="${contract.id}">Delete</button></div></article>`).join("") : `<div class="empty-state"><strong>No contracts yet</strong></div>`}
+        </div>
+      </section>
+    </div>`;
+  document.querySelector("#contractMakerForm").onsubmit = event => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget).entries());
+    contracts.unshift({ id: crypto.randomUUID(), ...data });
+    localStorage.setItem("vbeContracts", JSON.stringify(contracts));
+    renderContracts();
+  };
+}
+
+function printDocument(title, body) {
+  const popup = window.open("", "_blank", "width=900,height=900");
+  if (!popup) return alert("Please allow popups to print this document.");
+  popup.document.write(`<!doctype html><html><head><title>${escapeAttr(title)}</title><style>body{font:15px Arial;color:#17211d;margin:48px}header{display:flex;justify-content:space-between;border-bottom:3px solid #034b2b;padding-bottom:20px;margin-bottom:28px}h1,h2{margin:0 0 12px}table{width:100%;border-collapse:collapse;margin:24px 0}th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left}.right{text-align:right}.section{margin:26px 0;white-space:pre-wrap}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:70px}.signature{border-top:1px solid #222;padding-top:8px}@media print{button{display:none}}</style></head><body>${body}<script>window.onload=()=>window.print()<\/script></body></html>`);
+  popup.document.close();
+}
+
 function renderAll() {
   renderDashboard();
   renderClients();
+  renderInvoices();
+  renderContracts();
   renderEditors();
   renderWorkspace(currentUser || "Essi", "#view-workspace");
   renderLinks();
@@ -1578,7 +1682,7 @@ function setView(view) {
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active-view"));
   document.querySelector(`#view-${view}`).classList.add("active-view");
   document.querySelectorAll(".nav-item").forEach(item => item.classList.toggle("active", item.dataset.view === view));
-  const labels = { dashboard: "Dashboard", clients: "Clients", editors: "Editors", workspace: `${currentUser || "Essi"} Workspace`, links: "Quick Links", trash: "Trash", viewas: "View As Editor" };
+  const labels = { dashboard: "Dashboard", clients: "Clients", invoices: "Invoice Maker", contracts: "Contract Maker", editors: "Editors", workspace: `${currentUser || "Essi"} Workspace`, links: "Quick Links", trash: "Trash", viewas: "View As Editor" };
   document.querySelector("#page-title").textContent = labels[view];
   updateTopbar(view);
 }
@@ -1782,6 +1886,37 @@ document.addEventListener("click", async (event) => {
   const actionButtonEl = event.target.closest("[data-action]");
   const action = actionButtonEl?.dataset.action;
   if (action === "mark-project") return;
+
+  if (action === "print-invoice") {
+    const invoice = invoices.find(item => item.id === actionButtonEl.dataset.id);
+    if (!invoice) return;
+    const totals = invoiceTotal(invoice);
+    printDocument(invoice.number, `<header><div><h1>INVOICE</h1><strong>VISUALS BY ESSI</strong></div><div><strong>${escapeAttr(invoice.number)}</strong><br>Issued: ${escapeAttr(invoice.issueDate)}<br>Due: ${escapeAttr(invoice.dueDate)}</div></header><h2>Bill To</h2><p>${escapeAttr(invoice.client)}</p><table><thead><tr><th>Description</th><th>Qty</th><th>Rate</th><th class="right">Amount</th></tr></thead><tbody>${invoice.items.map(item => `<tr><td>${escapeAttr(item.description)}</td><td>${item.quantity}</td><td>$${item.rate.toFixed(2)}</td><td class="right">$${(item.quantity * item.rate).toFixed(2)}</td></tr>`).join("")}</tbody></table><div class="right">Subtotal: $${totals.subtotal.toFixed(2)}<br>Tax: $${totals.tax.toFixed(2)}<br>Discount: $${Number(invoice.discount).toFixed(2)}<h2>Total: $${totals.total.toFixed(2)}</h2></div><div class="section"><strong>Notes</strong><br>${escapeAttr(invoice.notes || "")}</div>`);
+    return;
+  }
+
+  if (action === "delete-invoice") {
+    if (!confirm("Delete this invoice?")) return;
+    invoices = invoices.filter(item => item.id !== actionButtonEl.dataset.id);
+    localStorage.setItem("vbeInvoices", JSON.stringify(invoices));
+    renderInvoices();
+    return;
+  }
+
+  if (action === "print-contract") {
+    const contract = contracts.find(item => item.id === actionButtonEl.dataset.id);
+    if (!contract) return;
+    printDocument(contract.title, `<header><div><h1>${escapeAttr(contract.title)}</h1><strong>VISUALS BY ESSI</strong></div><div>Effective: ${escapeAttr(contract.effectiveDate)}</div></header><p>This agreement is entered into between <strong>Visuals by Essi</strong> and <strong>${escapeAttr(contract.client)}</strong>.</p><div class="section"><h2>Scope of Work</h2>${escapeAttr(contract.scope)}</div><div class="section"><h2>Service Fee</h2>${escapeAttr(contract.fee)}</div><div class="section"><h2>Payment Terms</h2>${escapeAttr(contract.paymentTerms)}</div><div class="section"><h2>Additional Terms</h2>${escapeAttr(contract.terms || "None")}</div><div class="signatures"><div class="signature">Visuals by Essi<br>Date:</div><div class="signature">${escapeAttr(contract.client)}<br>Date:</div></div>`);
+    return;
+  }
+
+  if (action === "delete-contract") {
+    if (!confirm("Delete this contract?")) return;
+    contracts = contracts.filter(item => item.id !== actionButtonEl.dataset.id);
+    localStorage.setItem("vbeContracts", JSON.stringify(contracts));
+    renderContracts();
+    return;
+  }
 
   if (action === "view-project") {
     openProjectDetails(actionButtonEl.dataset.id);
