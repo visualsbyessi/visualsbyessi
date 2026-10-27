@@ -1619,10 +1619,18 @@ function updateInvoicePreview() {
   const preview = document.querySelector("#invoiceLivePreview");
   if (!invoice || !preview) return;
   const totals = invoiceTotal(invoice);
+  const paymentDetails = [
+    ["Bank", invoice.bankName],
+    ["Account number", invoice.accountNumber],
+    ["Account name", invoice.accountName],
+    ["SWIFT / bank code", invoice.bankExtra]
+  ].filter(([, value]) => String(value || "").trim())
+    .map(([label, value]) => `<small><b>${label}:</b> ${escapeAttr(String(value).trim())}</small>`)
+    .join("");
   preview.innerHTML = `<div class="modern-invoice-head"><div class="modern-invoice-client"><span>BILL TO</span><strong>${escapeAttr(invoice.clientName || invoice.client || "Client name")}</strong><small>${escapeAttr(invoice.clientAddress || "")}</small><small>${escapeAttr(invoice.clientEmail || "")}</small></div><div><b>INVOICE NO</b>${escapeAttr(invoice.number || "—")}<b>DATE ISSUED</b>${escapeAttr(invoice.issueDate || "—")}</div></div>
     <table><thead><tr><th>DESCRIPTION OF WORK</th><th>PRICE</th><th>QTY</th><th>TOTAL</th></tr></thead><tbody>${invoice.items.length ? invoice.items.map(item => `<tr><td>${escapeAttr(item.description)}</td><td>$${item.rate.toFixed(2)}</td><td>${item.quantity}</td><td>$${(item.quantity * item.rate).toFixed(2)}</td></tr>`).join("") : `<tr><td>Video editing</td><td>$0.00</td><td>1</td><td>$0.00</td></tr>`}<tr><td colspan="3">Subtotal</td><td>$${totals.subtotal.toFixed(2)}</td></tr></tbody></table>
     <div class="modern-invoice-total"><span>Total due</span><strong>$${totals.total.toFixed(2)}</strong></div>
-    <div class="modern-invoice-bottom"><div><span>BILL FROM</span><strong>${escapeAttr(invoice.fromName || "Visuals by Essi")}</strong><small>${escapeAttr(invoice.fromAddress || "")}</small><small>${escapeAttr(invoice.fromEmail || "")}</small></div><div><span>PAYMENT DETAILS</span><small><b>Bank:</b> ${escapeAttr(invoice.bankName || "—")}</small><small><b>Account number:</b> ${escapeAttr(invoice.accountNumber || "—")}</small><small><b>Account name:</b> ${escapeAttr(invoice.accountName || "—")}</small><small><b>SWIFT / bank code:</b> ${escapeAttr(invoice.bankExtra || "—")}</small></div></div><div class="modern-invoice-wordmark">INVOICE</div>`;
+    <div class="modern-invoice-bottom"><div><span>BILL FROM</span><strong>${escapeAttr(invoice.fromName || "Visuals by Essi")}</strong><small>${escapeAttr(invoice.fromAddress || "")}</small><small>${escapeAttr(invoice.fromEmail || "")}</small></div><div>${paymentDetails ? `<span>PAYMENT DETAILS</span>${paymentDetails}` : ""}</div></div><div class="modern-invoice-wordmark">INVOICE</div>`;
 }
 
 function printModernInvoice() {
