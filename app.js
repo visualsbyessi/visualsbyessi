@@ -1581,6 +1581,26 @@ function invoiceTotal(invoice) {
   return { subtotal, tax, total: subtotal + tax - Number(invoice.discount || 0) };
 }
 
+function configureEmbeddedInvoice(frame) {
+  try {
+    const invoiceDocument = frame.contentDocument;
+    const invoiceWindow = frame.contentWindow;
+    const styleSelect = invoiceDocument?.querySelector("#invoiceStyle");
+    const fontSelect = invoiceDocument?.querySelector("#invoiceFont");
+    if (styleSelect) {
+      styleSelect.value = "modern";
+      styleSelect.closest(".field")?.setAttribute("hidden", "");
+    }
+    if (fontSelect) {
+      fontSelect.value = "'Space Mono', monospace";
+      fontSelect.closest(".field")?.setAttribute("hidden", "");
+    }
+    invoiceWindow?.renderPreview?.();
+  } catch (error) {
+    console.warn("The invoice maker loaded, but its fixed Modern style could not be applied.", error);
+  }
+}
+
 function renderInvoices() {
   document.querySelector("#view-invoices").innerHTML = `
     <div class="invoice-embed-shell">
@@ -1590,6 +1610,7 @@ function renderInvoices() {
         title="Modern Invoice Maker"
         loading="eager"
         referrerpolicy="strict-origin-when-cross-origin"
+        onload="configureEmbeddedInvoice(this)"
       ></iframe>
     </div>`;
 }
