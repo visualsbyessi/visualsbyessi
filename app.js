@@ -582,6 +582,8 @@ let editingClientId = null;
 let detailsProjectId = null;
 let invoices = JSON.parse(localStorage.getItem("vbeInvoices") || "[]");
 let invoiceContacts = JSON.parse(localStorage.getItem("vbeInvoiceContacts") || "[]");
+let invoiceBusinesses = JSON.parse(localStorage.getItem("vbeInvoiceBusinesses") || "[]");
+let invoiceBanks = JSON.parse(localStorage.getItem("vbeInvoiceBanks") || "[]");
 let contracts = JSON.parse(localStorage.getItem("vbeContracts") || "[]");
 let draggingQuickLinkGroup = "";
 const selectedProjectIds = new Set();
@@ -1587,6 +1589,10 @@ function invoiceContactOptions(selected = "") {
   return names.map(name => `<option value="${escapeAttr(name)}"${name === selected ? " selected" : ""}>${escapeAttr(name)}</option>`).join("");
 }
 
+function savedInvoiceOptions(items, selected = "") {
+  return items.map(item => `<option value="${escapeAttr(item.name)}"${item.name === selected ? " selected" : ""}>${escapeAttr(item.name)}</option>`).join("");
+}
+
 function invoiceItemRow(item = { description: "", quantity: 1, rate: 0 }) {
   return `<div class="invoice-line-row">
     <label>Item<input data-invoice-item="description" value="${escapeAttr(item.description || "")}" placeholder="Video editing" /></label>
@@ -1617,7 +1623,18 @@ function updateInvoicePreview() {
     <div class="modern-invoice-client"><span>BILL TO</span><strong>${escapeAttr(invoice.clientName || invoice.client || "Client name")}</strong><small>${escapeAttr(invoice.clientEmail || "")}${invoice.clientAddress ? ` · ${escapeAttr(invoice.clientAddress)}` : ""}</small></div>
     <table><thead><tr><th>DESCRIPTION OF WORK</th><th>PRICE</th><th>QTY</th><th>TOTAL</th></tr></thead><tbody>${invoice.items.length ? invoice.items.map(item => `<tr><td>${escapeAttr(item.description)}</td><td>$${item.rate.toFixed(2)}</td><td>${item.quantity}</td><td>$${(item.quantity * item.rate).toFixed(2)}</td></tr>`).join("") : `<tr><td>Video editing</td><td>$0.00</td><td>1</td><td>$0.00</td></tr>`}<tr><td colspan="3">Subtotal</td><td>$${totals.subtotal.toFixed(2)}</td></tr></tbody></table>
     <div class="modern-invoice-total"><span>Total due</span><strong>$${totals.total.toFixed(2)}</strong></div>
-    <div class="modern-invoice-bottom"><div><span>BILL FROM</span><strong>${escapeAttr(invoice.fromName || "Visuals by Essi")}</strong><small>${escapeAttr(invoice.fromEmail || "")}</small></div><div><span>PAYMENT DETAILS</span><small>${escapeAttr(invoice.paymentDetails || "Add payment details")}</small></div></div><div class="modern-invoice-wordmark">INVOICE</div>`;
+    <div class="modern-invoice-bottom"><div><span>BILL FROM</span><strong>${escapeAttr(invoice.fromName || "Visuals by Essi")}</strong><small>${escapeAttr(invoice.fromEmail || "")}</small><small>${escapeAttr(invoice.fromAddress || "")}</small></div><div><span>PAYMENT DETAILS</span><strong>${escapeAttr(invoice.bankName || "Bank details")}</strong><small>${escapeAttr(invoice.accountName || "")} ${escapeAttr(invoice.accountNumber || "")}</small><small>${escapeAttr(invoice.bankExtra || "")}</small></div></div><div class="modern-invoice-wordmark">INVOICE</div>`;
+}
+
+function printModernInvoice() {
+  updateInvoicePreview();
+  const preview = document.querySelector("#invoiceLivePreview");
+  const invoice = readInvoiceDraft();
+  if (!preview || !invoice) return;
+  const popup = window.open("", "_blank", "width=900,height=900");
+  if (!popup) return alert("Please allow popups to download the invoice PDF.");
+  popup.document.write(`<!doctype html><html><head><title>${escapeAttr(invoice.number || "Invoice")}</title><link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"><style>@page{size:Letter;margin:0}*{box-sizing:border-box}body{margin:0;background:#fff;color:#161616;font:12px 'Space Mono',monospace}.modern-invoice-paper{width:8.5in;height:11in;padding:.65in .7in;background:#fff}.modern-invoice-head{display:flex;justify-content:space-between;gap:20px}.modern-invoice-head>div:first-child{display:grid;gap:8px}.modern-invoice-head>div:first-child span{color:#d9602f;font-size:42px;font-weight:700;letter-spacing:-.07em}.modern-invoice-head>div:last-child{display:grid;text-align:right;line-height:1.55}.modern-invoice-head b,.modern-invoice-client span,.modern-invoice-bottom span{font-size:10px;letter-spacing:.08em}.modern-invoice-client{display:grid;gap:5px;margin:50px 0 24px}.modern-invoice-client span,.modern-invoice-bottom span{color:#d9602f;font-weight:700}.modern-invoice-client small,.modern-invoice-bottom small{color:#5e5e5e}table{width:100%;border-collapse:collapse}th,td{padding:9px 4px;border-bottom:1px dotted #aaa;text-align:left}th:not(:first-child),td:not(:first-child){text-align:right}.modern-invoice-total{display:flex;justify-content:space-between;margin-top:8px;padding:12px 14px;background:#d9602f;color:#fff;font-weight:700}.modern-invoice-bottom{display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:110px}.modern-invoice-bottom>div{display:grid;gap:7px}.modern-invoice-wordmark{margin-top:34px;color:#d9602f;font-size:58px;font-weight:700;letter-spacing:-.08em}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}</style></head><body><div class="modern-invoice-paper">${preview.innerHTML}</div><script>window.onload=()=>window.print()<\/script></body></html>`);
+  popup.document.close();
 }
 
 function renderInvoices() {
@@ -1626,11 +1643,12 @@ function renderInvoices() {
     <section class="panel native-invoice-form"><div class="panel-header"><h2>New Invoice</h2></div>
       <form id="invoiceMakerForm" class="maker-form">
         <div class="form-grid"><label>Invoice number<input name="number" required value="INV-${String(invoices.length + 1).padStart(4, "0")}" /></label><label>Issue date<input name="issueDate" type="date" required value="${today}" /></label></div>
-        <div class="invoice-section-title">Bill from</div><div class="form-grid"><label>Business name<input name="fromName" value="Visuals by Essi" /></label><label>Email<input name="fromEmail" type="email" /></label></div>
-        <div class="invoice-section-title">Bill to</div><div class="invoice-client-tools"><label>Saved clients<select name="client"><option value="">Choose client</option>${invoiceContactOptions()}</select></label><button type="button" class="ghost-button" id="saveInvoiceClient">Save Client Details</button></div>
+        <div class="invoice-section-title">Your business details</div><div class="invoice-client-tools"><label>Saved businesses<select name="savedBusiness"><option value="">Choose business</option>${savedInvoiceOptions(invoiceBusinesses)}</select></label><button type="button" class="ghost-button" id="saveInvoiceBusiness">Save Business</button></div><div class="form-grid"><label>Business name<input name="fromName" value="Visuals by Essi" /></label><label>Email<input name="fromEmail" type="email" /></label><label class="form-wide">Business address<textarea name="fromAddress"></textarea></label></div>
+        <div class="invoice-section-title">Client details</div><div class="invoice-client-tools"><label>Saved clients<select name="client"><option value="">Choose client</option>${invoiceContactOptions()}</select></label><button type="button" class="ghost-button" id="saveInvoiceClient">Save Client</button></div>
         <div class="form-grid"><label>Client name<input name="clientName" required /></label><label>Client email<input name="clientEmail" type="email" /></label><label class="form-wide">Client address<textarea name="clientAddress"></textarea></label></div>
         <div class="invoice-section-title">Line items</div><div id="invoiceLineItems">${invoiceItemRow({ description: "Video Editing", quantity: 1, rate: 0 })}</div><button type="button" class="ghost-button" id="addInvoiceLine">+ Add item</button>
-        <div class="form-grid"><label>Tax (%)<input name="tax" type="number" min="0" value="0" /></label><label>Discount ($)<input name="discount" type="number" min="0" value="0" /></label><label class="form-wide">Payment details<textarea name="paymentDetails" placeholder="Bank name and account details"></textarea></label><label class="form-wide">Note (optional)<textarea name="notes"></textarea></label></div>
+        <div class="invoice-section-title">Bank and payment details</div><div class="invoice-client-tools"><label>Saved bank accounts<select name="savedBank"><option value="">Choose bank account</option>${savedInvoiceOptions(invoiceBanks)}</select></label><button type="button" class="ghost-button" id="saveInvoiceBank">Save Bank</button></div><div class="form-grid"><label>Bank name<input name="bankName" /></label><label>Account name<input name="accountName" /></label><label>Account number<input name="accountNumber" /></label><label>SWIFT / bank code<input name="bankExtra" /></label></div>
+        <div class="form-grid"><label>Tax (%)<input name="tax" type="number" min="0" value="0" /></label><label>Discount ($)<input name="discount" type="number" min="0" value="0" /></label><label class="form-wide">Note (optional)<textarea name="notes"></textarea></label></div>
         <div class="invoice-form-actions"><button class="ghost-button" type="submit">Save Invoice</button><button class="primary-button" type="button" id="printInvoiceDraft">Download PDF</button></div>
       </form></section>
     <section class="panel native-invoice-preview-panel"><div class="panel-header"><h2>Live Preview</h2><span class="muted">Modern invoice</span></div><div id="invoiceLivePreview" class="modern-invoice-paper"></div></section></div>`;
@@ -1643,6 +1661,8 @@ function renderInvoices() {
     form.elements.clientAddress.value = contact?.address || "";
     updateInvoicePreview();
   };
+  form.elements.savedBusiness.onchange = event => { const item = invoiceBusinesses.find(entry => entry.name === event.target.value); if (!item) return; form.elements.fromName.value = item.name || ""; form.elements.fromEmail.value = item.email || ""; form.elements.fromAddress.value = item.address || ""; updateInvoicePreview(); };
+  form.elements.savedBank.onchange = event => { const item = invoiceBanks.find(entry => entry.name === event.target.value); if (!item) return; form.elements.bankName.value = item.name || ""; form.elements.accountName.value = item.accountName || ""; form.elements.accountNumber.value = item.accountNumber || ""; form.elements.bankExtra.value = item.extra || ""; updateInvoicePreview(); };
   document.querySelector("#addInvoiceLine").onclick = () => { document.querySelector("#invoiceLineItems").insertAdjacentHTML("beforeend", invoiceItemRow()); updateInvoicePreview(); };
   document.querySelector("#invoiceLineItems").onclick = event => { if (event.target.closest(".invoice-line-remove")) { event.target.closest(".invoice-line-row").remove(); updateInvoicePreview(); } };
   document.querySelector("#saveInvoiceClient").onclick = () => {
@@ -1654,8 +1674,10 @@ function renderInvoices() {
     localStorage.setItem("vbeInvoiceContacts", JSON.stringify(invoiceContacts));
     alert("Client details saved.");
   };
+  document.querySelector("#saveInvoiceBusiness").onclick = () => { const name = form.elements.fromName.value.trim(); if (!name) return alert("Enter your business name first."); invoiceBusinesses = invoiceBusinesses.filter(item => item.name.toLowerCase() !== name.toLowerCase()); invoiceBusinesses.push({ name, email: form.elements.fromEmail.value.trim(), address: form.elements.fromAddress.value.trim() }); localStorage.setItem("vbeInvoiceBusinesses", JSON.stringify(invoiceBusinesses)); alert("Business details saved."); };
+  document.querySelector("#saveInvoiceBank").onclick = () => { const name = form.elements.bankName.value.trim(); if (!name) return alert("Enter the bank name first."); invoiceBanks = invoiceBanks.filter(item => item.name.toLowerCase() !== name.toLowerCase()); invoiceBanks.push({ name, accountName: form.elements.accountName.value.trim(), accountNumber: form.elements.accountNumber.value.trim(), extra: form.elements.bankExtra.value.trim() }); localStorage.setItem("vbeInvoiceBanks", JSON.stringify(invoiceBanks)); alert("Bank details saved."); };
   form.onsubmit = event => { event.preventDefault(); const invoice = readInvoiceDraft(); if (!invoice.items.length) return alert("Add at least one item."); invoices.unshift({ id: crypto.randomUUID(), ...invoice }); localStorage.setItem("vbeInvoices", JSON.stringify(invoices)); alert("Invoice saved."); };
-  document.querySelector("#printInvoiceDraft").onclick = () => { const invoice = readInvoiceDraft(); updateInvoicePreview(); printDocument(invoice.number || "Invoice", document.querySelector("#invoiceLivePreview").innerHTML); };
+  document.querySelector("#printInvoiceDraft").onclick = printModernInvoice;
   updateInvoicePreview();
 }
 
