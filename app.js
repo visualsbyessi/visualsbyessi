@@ -197,7 +197,7 @@ function deliverableInputIsActive() {
 }
 
 async function liveSyncRemoteData() {
-  if (!remoteEnabled || liveSyncRunning || formIsOpen() || deliverableInputIsActive() || !currentUser) return;
+  if (!remoteEnabled || liveSyncRunning || formIsOpen() || deliverableInputIsActive() || !currentUser || currentView === "invoices") return;
   liveSyncRunning = true;
   try {
     await loadRemoteData();
@@ -581,6 +581,7 @@ let editingLinkId = null;
 let editingClientId = null;
 let detailsProjectId = null;
 let invoices = JSON.parse(localStorage.getItem("vbeInvoices") || "[]");
+let invoiceContacts = JSON.parse(localStorage.getItem("vbeInvoiceContacts") || "[]");
 let contracts = JSON.parse(localStorage.getItem("vbeContracts") || "[]");
 let draggingQuickLinkGroup = "";
 const selectedProjectIds = new Set();
@@ -1581,40 +1582,81 @@ function invoiceTotal(invoice) {
   return { subtotal, tax, total: subtotal + tax - Number(invoice.discount || 0) };
 }
 
-function configureEmbeddedInvoice(frame) {
-  try {
-    const invoiceDocument = frame.contentDocument;
-    const invoiceWindow = frame.contentWindow;
-    const styleSelect = invoiceDocument?.querySelector("#invoiceStyle");
-    const fontSelect = invoiceDocument?.querySelector("#invoiceFont");
-    if (styleSelect) {
-      styleSelect.value = "modern";
-      const styleField = styleSelect.closest(".field");
-      if (styleField) styleField.style.display = "none";
-    }
-    if (fontSelect) {
-      fontSelect.value = "'Space Mono', monospace";
-      const fontField = fontSelect.closest(".field");
-      if (fontField) fontField.style.display = "none";
-    }
-    invoiceWindow?.renderPreview?.();
-  } catch (error) {
-    console.warn("The invoice maker loaded, but its fixed Modern style could not be applied.", error);
-  }
+function invoiceContactOptions(selected = "") {
+  const names = [...new Set([...clients.map(client => client.name), ...invoiceContacts.map(client => client.name)])];
+  return names.map(name => `<option value="${escapeAttr(name)}"${name === selected ? " selected" : ""}>${escapeAttr(name)}</option>`).join("");
+}
+
+function invoiceItemRow(item = { description: "", quantity: 1, rate: 0 }) {
+  return `<div class="invoice-line-row">
+    <label>Item<input data-invoice-item="description" value="${escapeAttr(item.description || "")}" placeholder="Video editing" /></label>
+    <label>Quantity<input data-invoice-item="quantity" type="number" min="0" step="1" value="${Number(item.quantity || 1)}" /></label>
+    <label>Price<input data-invoice-item="rate" type="number" min="0" step="0.01" value="${Number(item.rate || 0)}" /></label>
+    <button type="button" class="danger-button invoice-line-remove" aria-label="Remove line item">×</button>
+  </div>`;
+}
+
+function readInvoiceDraft() {
+  const form = document.querySelector("#invoiceMakerForm");
+  if (!form) return null;
+  const data = Object.fromEntries(new FormData(form).entries());
+  const items = [...form.querySelectorAll(".invoice-line-row")].map(row => ({
+    description: row.querySelector('[data-invoice-item="description"]').value.trim(),
+    quantity: Math.max(Number(row.querySelector('[data-invoice-item="quantity"]').value || 0), 0),
+    rate: Math.max(Number(row.querySelector('[data-invoice-item="rate"]').value || 0), 0)
+  })).filter(item => item.description);
+  return { ...data, items, tax: Number(data.tax || 0), discount: Number(data.discount || 0) };
+}
+
+function updateInvoicePreview() {
+  const invoice = readInvoiceDraft();
+  const preview = document.querySelector("#invoiceLivePreview");
+  if (!invoice || !preview) return;
+  const totals = invoiceTotal(invoice);
+  preview.innerHTML = `<div class="modern-invoice-head"><div><span>INVOICE</span><strong>VISUALS BY ESSI</strong></div><div><b>INVOICE NO</b>${escapeAttr(invoice.number || "—")}<b>DATE ISSUED</b>${escapeAttr(invoice.issueDate || "—")}</div></div>
+    <div class="modern-invoice-client"><span>BILL TO</span><strong>${escapeAttr(invoice.clientName || invoice.client || "Client name")}</strong><small>${escapeAttr(invoice.clientEmail || "")}${invoice.clientAddress ? ` · ${escapeAttr(invoice.clientAddress)}` : ""}</small></div>
+    <table><thead><tr><th>DESCRIPTION OF WORK</th><th>PRICE</th><th>QTY</th><th>TOTAL</th></tr></thead><tbody>${invoice.items.length ? invoice.items.map(item => `<tr><td>${escapeAttr(item.description)}</td><td>$${item.rate.toFixed(2)}</td><td>${item.quantity}</td><td>$${(item.quantity * item.rate).toFixed(2)}</td></tr>`).join("") : `<tr><td>Video editing</td><td>$0.00</td><td>1</td><td>$0.00</td></tr>`}<tr><td colspan="3">Subtotal</td><td>$${totals.subtotal.toFixed(2)}</td></tr></tbody></table>
+    <div class="modern-invoice-total"><span>Total due</span><strong>$${totals.total.toFixed(2)}</strong></div>
+    <div class="modern-invoice-bottom"><div><span>BILL FROM</span><strong>${escapeAttr(invoice.fromName || "Visuals by Essi")}</strong><small>${escapeAttr(invoice.fromEmail || "")}</small></div><div><span>PAYMENT DETAILS</span><small>${escapeAttr(invoice.paymentDetails || "Add payment details")}</small></div></div><div class="modern-invoice-wordmark">INVOICE</div>`;
 }
 
 function renderInvoices() {
-  document.querySelector("#view-invoices").innerHTML = `
-    <div class="invoice-embed-shell">
-      <iframe
-        class="invoice-embed"
-        src="https://visualsbyessi.github.io/invoice/"
-        title="Modern Invoice Maker"
-        loading="eager"
-        referrerpolicy="strict-origin-when-cross-origin"
-        onload="configureEmbeddedInvoice(this)"
-      ></iframe>
-    </div>`;
+  const today = new Date().toISOString().slice(0, 10);
+  document.querySelector("#view-invoices").innerHTML = `<div class="native-invoice-layout">
+    <section class="panel native-invoice-form"><div class="panel-header"><h2>New Invoice</h2></div>
+      <form id="invoiceMakerForm" class="maker-form">
+        <div class="form-grid"><label>Invoice number<input name="number" required value="INV-${String(invoices.length + 1).padStart(4, "0")}" /></label><label>Issue date<input name="issueDate" type="date" required value="${today}" /></label></div>
+        <div class="invoice-section-title">Bill from</div><div class="form-grid"><label>Business name<input name="fromName" value="Visuals by Essi" /></label><label>Email<input name="fromEmail" type="email" /></label></div>
+        <div class="invoice-section-title">Bill to</div><div class="invoice-client-tools"><label>Saved clients<select name="client"><option value="">Choose client</option>${invoiceContactOptions()}</select></label><button type="button" class="ghost-button" id="saveInvoiceClient">Save Client Details</button></div>
+        <div class="form-grid"><label>Client name<input name="clientName" required /></label><label>Client email<input name="clientEmail" type="email" /></label><label class="form-wide">Client address<textarea name="clientAddress"></textarea></label></div>
+        <div class="invoice-section-title">Line items</div><div id="invoiceLineItems">${invoiceItemRow({ description: "Video Editing", quantity: 1, rate: 0 })}</div><button type="button" class="ghost-button" id="addInvoiceLine">+ Add item</button>
+        <div class="form-grid"><label>Tax (%)<input name="tax" type="number" min="0" value="0" /></label><label>Discount ($)<input name="discount" type="number" min="0" value="0" /></label><label class="form-wide">Payment details<textarea name="paymentDetails" placeholder="Bank name and account details"></textarea></label><label class="form-wide">Note (optional)<textarea name="notes"></textarea></label></div>
+        <div class="invoice-form-actions"><button class="ghost-button" type="submit">Save Invoice</button><button class="primary-button" type="button" id="printInvoiceDraft">Download PDF</button></div>
+      </form></section>
+    <section class="panel native-invoice-preview-panel"><div class="panel-header"><h2>Live Preview</h2><span class="muted">Modern invoice</span></div><div id="invoiceLivePreview" class="modern-invoice-paper"></div></section></div>`;
+  const form = document.querySelector("#invoiceMakerForm");
+  form.addEventListener("input", updateInvoicePreview);
+  form.elements.client.onchange = event => {
+    const contact = invoiceContacts.find(item => item.name === event.target.value);
+    form.elements.clientName.value = contact?.name || event.target.value;
+    form.elements.clientEmail.value = contact?.email || "";
+    form.elements.clientAddress.value = contact?.address || "";
+    updateInvoicePreview();
+  };
+  document.querySelector("#addInvoiceLine").onclick = () => { document.querySelector("#invoiceLineItems").insertAdjacentHTML("beforeend", invoiceItemRow()); updateInvoicePreview(); };
+  document.querySelector("#invoiceLineItems").onclick = event => { if (event.target.closest(".invoice-line-remove")) { event.target.closest(".invoice-line-row").remove(); updateInvoicePreview(); } };
+  document.querySelector("#saveInvoiceClient").onclick = () => {
+    const name = form.elements.clientName.value.trim();
+    if (!name) return alert("Enter the client name first.");
+    const contact = { name, email: form.elements.clientEmail.value.trim(), address: form.elements.clientAddress.value.trim() };
+    invoiceContacts = invoiceContacts.filter(item => item.name.toLowerCase() !== name.toLowerCase());
+    invoiceContacts.push(contact);
+    localStorage.setItem("vbeInvoiceContacts", JSON.stringify(invoiceContacts));
+    alert("Client details saved.");
+  };
+  form.onsubmit = event => { event.preventDefault(); const invoice = readInvoiceDraft(); if (!invoice.items.length) return alert("Add at least one item."); invoices.unshift({ id: crypto.randomUUID(), ...invoice }); localStorage.setItem("vbeInvoices", JSON.stringify(invoices)); alert("Invoice saved."); };
+  document.querySelector("#printInvoiceDraft").onclick = () => { const invoice = readInvoiceDraft(); updateInvoicePreview(); printDocument(invoice.number || "Invoice", document.querySelector("#invoiceLivePreview").innerHTML); };
+  updateInvoicePreview();
 }
 
 function renderContracts() {
