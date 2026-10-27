@@ -1722,12 +1722,12 @@ body:has(.modal.open) {
 .invoice-line-remove { min-height: 43px; padding: 8px; }
 .invoice-form-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .modern-invoice-paper {
-  height: calc(100vh - 218px);
+  height: calc(100% - 58px);
   width: auto;
   max-width: 100%;
   aspect-ratio: 8.5 / 11;
   min-height: 0;
-  margin: 0 auto;
+  margin: auto;
   padding: clamp(24px, 3.2vw, 48px) clamp(25px, 3.4vw, 52px);
   background: #fff;
   color: #161616;
@@ -1750,7 +1750,7 @@ body:has(.modal.open) {
 .modern-invoice-bottom span { color: #d9602f; font-weight: 800; }
 .modern-invoice-client small,
 .modern-invoice-bottom small { color: #5e5e5e; }
-.modern-invoice-paper table { width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 18px; flex: 0 0 auto; }
+.modern-invoice-paper table { width: 100%; min-width: 0; table-layout: fixed; border-collapse: collapse; margin-top: 18px; flex: 0 0 auto; }
 .modern-invoice-paper table,
 .modern-invoice-paper thead,
 .modern-invoice-paper tbody,
