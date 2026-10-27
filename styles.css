@@ -1750,7 +1750,7 @@ body:has(.modal.open) {
 .modern-invoice-bottom span { color: #d9602f; font-weight: 800; }
 .modern-invoice-client small,
 .modern-invoice-bottom small { color: #5e5e5e; }
-.modern-invoice-paper table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+.modern-invoice-paper table { width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 18px; flex: 0 0 auto; }
 .modern-invoice-paper table,
 .modern-invoice-paper thead,
 .modern-invoice-paper tbody,
@@ -1759,7 +1759,7 @@ body:has(.modal.open) {
 .modern-invoice-paper td { background: #fff !important; color: #161616 !important; }
 .modern-invoice-paper thead th { background: #d9602f !important; color: #fff !important; border: 0; }
 .modern-invoice-paper th,
-.modern-invoice-paper td { padding: 9px 4px; border-bottom: 1px dotted #aaa; text-align: left; }
+.modern-invoice-paper td { padding: 7px 4px; border-bottom: 1px dotted #aaa; text-align: left; overflow-wrap: anywhere; }
 .modern-invoice-paper th:not(:first-child),
 .modern-invoice-paper td:not(:first-child) { text-align: right; }
 .modern-invoice-paper th:nth-child(2),
@@ -1768,10 +1768,10 @@ body:has(.modal.open) {
 .modern-invoice-paper td:nth-child(3) { width: 12%; white-space: nowrap; }
 .modern-invoice-paper th:nth-child(4),
 .modern-invoice-paper td:nth-child(4) { width: 18%; white-space: nowrap; }
-.modern-invoice-total { display: flex; justify-content: space-between; margin-top: 8px; padding: 12px 14px; background: #d9602f; color: #fff; font-weight: 800; }
-.modern-invoice-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: auto; padding-top: 40px; }
+.modern-invoice-total { display: flex; justify-content: space-between; margin-top: 7px; padding: 10px 12px; background: #d9602f; color: #fff; font-weight: 800; flex: 0 0 auto; }
+.modern-invoice-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: auto; padding-top: 22px; flex: 0 0 auto; }
 .modern-invoice-bottom > div { display: grid; gap: 4px; }
-.modern-invoice-wordmark { margin-top: 28px; color: #d9602f; font-size: clamp(36px, 4vw, 64px); font-weight: 800; letter-spacing: -.08em; }
+.modern-invoice-wordmark { margin-top: 16px; color: #d9602f; font-size: clamp(34px, 3.7vw, 56px); line-height: 1; font-weight: 800; letter-spacing: -.08em; flex: 0 0 auto; }
 body.night-mode .native-invoice-preview-panel { background: var(--panel-soft); }
 body.night-mode .native-invoice-form label,
 body.night-mode .native-invoice-form .invoice-section-title { color: var(--text); }
