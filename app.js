@@ -11,6 +11,21 @@ const users = {
   Drix: { role: "Editor", username: "drix", password: "demo", access: "nicolas", discordId: "" }
 };
 
+const clients = [
+  { id: "legacy-deniss", name: "Deniss", rates: [
+    { type: "Regular Edit", invoiceRate: 20, editorRate: 350, billing: "video" },
+    { type: "Long Story", invoiceRate: 25, editorRate: 350, billing: "2_minutes" },
+    { type: "Translation", invoiceRate: 15, editorRate: 350, billing: "video" }
+  ] },
+  { id: "legacy-mehdi", name: "Mehdi", rates: [
+    { type: "Regular Edit", invoiceRate: 20, editorRate: 350, billing: "video" }
+  ] },
+  { id: "legacy-nicolas", name: "Nicolas", rates: [
+    { type: "Easy", invoiceRate: 15, editorRate: 350, billing: "video" },
+    { type: "Hard", invoiceRate: 20, editorRate: 500, billing: "video" }
+  ] }
+];
+
 const SUPABASE_URL = "https://hbyvddtczxjmjiommlcg.supabase.co";
 const SUPABASE_KEY = "sb_publishable_JpMQkv99uAgopgWsRtxwOA_RWiB6-2S";
 const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
@@ -19,6 +34,7 @@ let remoteEnabled = true;
 let remotePaidAtEnabled = true;
 let remoteTrashEnabled = true;
 let remoteProjectNotesEnabled = true;
+let remoteClientsEnabled = true;
 let liveSyncRunning = false;
 const PAID_DELETE_AFTER_DAYS = 7;
 
@@ -65,6 +81,26 @@ function dedupeEditors() {
 async function loadRemoteData() {
   if (!remoteEnabled) return;
   try {
+    if (remoteClientsEnabled) {
+      try {
+        const remoteClients = await supabaseRequest("/clients?select=*&order=name.asc");
+        clients.splice(0, clients.length, ...remoteClients.map(client => ({
+          id: client.id,
+          name: client.name,
+          rates: Array.isArray(client.rates) ? client.rates.map(rate => ({
+            type: rate.type || "Project",
+            invoiceRate: Number(rate.invoiceRate ?? rate.invoice_rate ?? 0),
+            editorRate: Number(rate.editorRate ?? rate.editor_rate ?? 0),
+            billing: rate.billing === "2_minutes" ? "minutes" : (rate.billing || "video"),
+            billingMinutes: Number(rate.billingMinutes ?? rate.billing_minutes ?? (rate.billing === "2_minutes" ? 2 : 0))
+          })) : []
+        })));
+      } catch (error) {
+        remoteClientsEnabled = false;
+        console.warn("Client management needs the clients table update.", error);
+      }
+    }
+
     const remoteEditors = await supabaseRequest("/editors?select=*&order=created_at.asc");
     if (remoteEditors.length) {
       editors.splice(0, editors.length);
@@ -121,6 +157,37 @@ async function loadRemoteData() {
   }
 }
 
+function clientByName(name) {
+  return clients.find(client => client.name.toLowerCase() === String(name || "").toLowerCase());
+}
+
+function rateForProject(project) {
+  const client = clientByName(project.client);
+  return client?.rates?.find(rate => rate.type.toLowerCase() === String(project.type || "").toLowerCase()) || null;
+}
+
+function rateBillingMinutes(rate) {
+  if (!rate) return 0;
+  if (rate.billing === "2_minutes") return 2;
+  return rate.billing === "minutes" ? Math.max(Number(rate.billingMinutes || 1), 0.01) : 0;
+}
+
+async function saveClientRemote(client) {
+  if (!remoteEnabled || !remoteClientsEnabled) return;
+  const payload = { name: client.name, rates: client.rates };
+  if (client.id && !String(client.id).startsWith("local-") && !String(client.id).startsWith("legacy-")) {
+    await supabaseRequest(`/clients?id=eq.${encodeURIComponent(client.id)}`, { method: "PATCH", body: JSON.stringify(payload) });
+    return;
+  }
+  const [created] = await supabaseRequest("/clients", { method: "POST", body: JSON.stringify(payload) });
+  if (created?.id) client.id = created.id;
+}
+
+async function deleteClientRemote(client) {
+  if (!remoteEnabled || !remoteClientsEnabled || !client?.id || String(client.id).startsWith("local-") || String(client.id).startsWith("legacy-")) return;
+  await supabaseRequest(`/clients?id=eq.${encodeURIComponent(client.id)}`, { method: "DELETE" });
+}
+
 function formIsOpen() {
   return Boolean(document.querySelector(".modal.open"));
 }
@@ -131,7 +198,6 @@ function deliverableInputIsActive() {
 
 async function liveSyncRemoteData() {
   if (!remoteEnabled || liveSyncRunning || formIsOpen() || deliverableInputIsActive() || !currentUser) return;
-  if (currentView === "voiceover") return;
   liveSyncRunning = true;
   try {
     await loadRemoteData();
@@ -512,10 +578,12 @@ let searchTerm = "";
 let editingEditorName = null;
 let editingProjectId = null;
 let editingLinkId = null;
+let editingClientId = null;
+let detailsProjectId = null;
 let draggingQuickLinkGroup = "";
 const selectedProjectIds = new Set();
 let nextId = 15;
-const defaultNavOrder = ["dashboard", "md", "nicolas", "editors", "workspace", "voiceover", "links", "trash", "viewas"];
+const defaultNavOrder = ["dashboard", "clients", "editors", "workspace", "links", "trash", "viewas"];
 let currentTheme = localStorage.getItem("visualsByEssiTheme") || "day";
 
 const projects = [
@@ -572,6 +640,7 @@ function money(n, currency = "$") {
 }
 
 function allowedEditors(client) {
+  if (clientByName(client)) return editors;
   if (client === "Nicolas") return nicolasEditors;
   return mdEditors;
 }
@@ -610,6 +679,12 @@ function findUserByLogin(username) {
 
 function editorPay(project) {
   if (!project.editor) return 0;
+  const configuredRate = rateForProject(project);
+  if (configuredRate) {
+    const minutes = rateBillingMinutes(configuredRate);
+    if (minutes) return Math.ceil((project.duration || minutes) / minutes) * configuredRate.editorRate;
+    return configuredRate.editorRate;
+  }
   if (project.client === "Nicolas") return project.type === "Hard" ? 500 : 350;
   if (mdEditors.includes(project.editor)) return 350;
   return 0;
@@ -650,6 +725,12 @@ function isDuplicateProject(candidate, ignoreId = "") {
 }
 
 function invoiceAmount(project) {
+  const configuredRate = rateForProject(project);
+  if (configuredRate) {
+    const minutes = rateBillingMinutes(configuredRate);
+    if (minutes) return Math.ceil((project.duration || minutes) / minutes) * configuredRate.invoiceRate;
+    return configuredRate.invoiceRate;
+  }
   if (project.client === "Deniss") {
     if (project.type === "Long Story") return Math.ceil((project.duration || 2) / 2) * 25;
     if (project.type === "Translation") return 15;
@@ -660,6 +741,11 @@ function invoiceAmount(project) {
 }
 
 function invoiceRate(project) {
+  const configuredRate = rateForProject(project);
+  if (configuredRate) {
+    const minutes = rateBillingMinutes(configuredRate);
+    return minutes ? `$${configuredRate.invoiceRate} per ${minutes} min` : `$${configuredRate.invoiceRate}/project`;
+  }
   if (project.client === "Deniss") {
     if (project.type === "Long Story") return "$25 per 2 min";
     if (project.type === "Translation") return "$15/video";
@@ -700,9 +786,7 @@ function canSeeQuickLink(link, user = currentUser) {
   const client = link.client || "All";
   if (client === "All") return true;
   if (client === "Private") return false;
-  if (client === "Nicolas") return nicolasEditors.includes(user);
-  if (["Mehdi", "Deniss", "Mehdi & Deniss"].includes(client)) return mdEditors.includes(user);
-  return false;
+  return allowedEditors(client).includes(user);
 }
 
 function saveNavOrder() {
@@ -816,7 +900,7 @@ function parseDuration(value = "") {
 
 function updateDurationField() {
   const form = document.querySelector("#projectForm");
-  const showDuration = isAdmin() && form.elements.client.value === "Deniss" && form.elements.type.value === "Long Story";
+  const showDuration = rateBillingMinutes(rateForProject({ client: form.elements.client.value, type: form.elements.type.value })) > 0;
   const field = document.querySelector("[data-form-field='duration']");
   field.classList.toggle("hidden", !showDuration);
   form.elements.duration.required = showDuration;
@@ -996,7 +1080,7 @@ function projectTable(rows, opts = {}) {
           ${filteredRows.length ? filteredRows.map(p => `
             <tr class="${selectedProjectIds.has(String(p.id)) ? "row-selected" : ""}">
               ${allowBulk ? `<td class="mark-col"><input class="mark-project" type="checkbox" data-action="mark-project" data-id="${p.id}" ${selectedProjectIds.has(String(p.id)) ? "checked" : ""} ${p.status === "Paid" ? "disabled" : ""} aria-label="Mark ${p.project}" /></td>` : ""}
-              <td><strong>${p.project}</strong>${p.notes ? `<span class="project-note">${p.notes}</span>` : ""}</td>
+              <td><button class="project-name-button" data-action="view-project" data-id="${p.id}" type="button">${escapeAttr(p.project)}</button>${p.notes ? `<span class="project-note">${escapeAttr(p.notes)}</span>` : ""}</td>
               ${includeClient ? `<td>${p.client}</td>` : ""}
               <td>${typeChip(p)}</td>
               ${includeScriptRaw ? `<td>${linkCell(p.scriptLink)}</td><td>${linkCell(p.rawLink)}</td>` : ""}
@@ -1065,15 +1149,15 @@ function topEarnings(editor) {
 function renderDashboard() {
   const active = activeProjects();
   const billable = active.filter(p => p.status === "Done");
+  const dashboardClientNames = [...new Set([...clients.map(client => client.name), ...active.map(project => project.client)].filter(Boolean))].sort();
+  if (dashboardInvoiceFilter !== "all" && !dashboardClientNames.includes(dashboardInvoiceFilter)) dashboardInvoiceFilter = "all";
   const payable = active.filter(p => p.status === "Done");
-  const deniss = billable.filter(p => p.client === "Deniss");
-  const nicolas = billable.filter(p => p.client === "Nicolas");
   const payouts = payable.reduce((sum, p) => sum + editorPay(p), 0);
-  const invoices = deniss.concat(nicolas).reduce((sum, p) => sum + invoiceAmount(p), 0);
+  const invoices = billable.reduce((sum, p) => sum + invoiceAmount(p), 0);
   const invoiceRows = billable.filter(p => dashboardInvoiceFilter === "all" || p.client === dashboardInvoiceFilter);
-  const invoiceCardClass = client => dashboardBreakdownMode === "invoice" && dashboardInvoiceFilter === client ? " active-filter" : "";
+  const invoiceCardClass = dashboardBreakdownMode === "invoice" ? " active-filter" : "";
   const payoutCardClass = dashboardBreakdownMode === "payout" ? " active-filter" : "";
-  const typeSummary = ["Regular Edit", "Long Story", "Translation", "Easy", "Hard"]
+  const typeSummary = [...new Set(invoiceRows.map(project => project.type))]
     .map(type => ({ type, count: invoiceRows.filter(project => project.type === type).length }))
     .filter(item => item.count > 0);
   const payoutRows = payable.filter(project => project.editor);
@@ -1082,10 +1166,23 @@ function renderDashboard() {
 
   document.querySelector("#view-dashboard").innerHTML = `
     <div class="cards">
-      <div class="card invoice-filter-card${invoiceCardClass("Deniss")}" data-invoice-filter="Deniss"><span class="card-icon">${icon("file")}</span><span class="label">Deniss invoice</span><strong>${money(deniss.reduce((s, p) => s + invoiceAmount(p), 0))}</strong><small>${deniss.length} unpaid videos</small></div>
-      <div class="card invoice-filter-card${invoiceCardClass("Nicolas")}" data-invoice-filter="Nicolas"><span class="card-icon">${icon("file")}</span><span class="label">Nicolas invoice</span><strong>${money(nicolas.reduce((s, p) => s + invoiceAmount(p), 0))}</strong><small>${nicolas.length} unpaid videos</small></div>
+      <div class="card invoice-filter-card${invoiceCardClass}" data-invoice-mode="true">
+        <span class="card-icon">${icon("file")}</span>
+        <span class="label">Client invoices</span>
+        <strong>${money(invoiceRows.reduce((sum, project) => sum + invoiceAmount(project), 0))}</strong>
+        <small>${invoiceRows.length} unpaid videos${dashboardInvoiceFilter === "all" ? "" : ` · ${escapeAttr(dashboardInvoiceFilter)}`}</small>
+      </div>
       <div class="card invoice-filter-card${payoutCardClass}" data-payout-filter="true"><span class="card-icon green-icon">${icon("wallet")}</span><span class="label">Editor payouts</span><strong>₱${payouts.toLocaleString()}</strong><small>Unpaid done work</small></div>
-      <div class="card invoice-filter-card${invoiceCardClass("all")}" data-invoice-filter="all"><span class="card-icon">${icon("wallet")}</span><span class="label">Invoice total</span><strong>${money(invoices)}</strong><small>Total unpaid billable</small></div>
+      <div class="card"><span class="card-icon">${icon("wallet")}</span><span class="label">Invoice total</span><strong>${money(invoices)}</strong><small>Total unpaid billable</small></div>
+      <div class="card dashboard-filter-card">
+        <span class="card-icon">${icon("search")}</span>
+        <span class="label">Filter client</span>
+        <select class="dashboard-client-select" data-action="invoice-client-filter" aria-label="Filter dashboard by client">
+          <option value="all"${dashboardInvoiceFilter === "all" ? " selected" : ""}>All clients</option>
+          ${dashboardClientNames.map(name => `<option value="${escapeAttr(name)}"${dashboardInvoiceFilter === name ? " selected" : ""}>${escapeAttr(name)}</option>`).join("")}
+        </select>
+        <small>Updates invoices and breakdown</small>
+      </div>
     </div>
     <div class="two-col">
       <div class="panel breakdown-table">
@@ -1096,7 +1193,7 @@ function renderDashboard() {
               <option value="all"${dashboardPayoutEditor === "all" ? " selected" : ""}>All editors</option>
               ${editors.map(editor => `<option value="${editor}"${dashboardPayoutEditor === editor ? " selected" : ""}>${editor}</option>`).join("")}
             </select>
-          ` : ""}
+          ` : `<span class="filter-caption">${dashboardInvoiceFilter === "all" ? "All clients" : escapeAttr(dashboardInvoiceFilter)}</span>`}
         </div>
         <div class="breakdown-scroll">
           ${dashboardBreakdownMode === "payout" ? `
@@ -1234,15 +1331,10 @@ function renderWorkspace(editor = activeEditor, target = "#view-workspace") {
 
 function renderLinks() {
   const visibleLinks = quickLinks.filter(link => canSeeQuickLink(link));
-  const groups = ["Mehdi", "Deniss", "Nicolas", "Private"]
+  const groups = [...clients.map(client => client.name), "Private"]
     .map(client => ({
       client,
-      links: visibleLinks.filter(link => {
-        const linkClient = link.client || "All";
-        if (client === "Mehdi") return linkClient === "Mehdi" || linkClient === "Mehdi & Deniss";
-        if (client === "Deniss") return linkClient === "Deniss" || linkClient === "Mehdi & Deniss";
-        return linkClient === client;
-      })
+      links: visibleLinks.filter(link => (link.client || "Private") === client)
     }))
     .filter(group => group.links.length || isAdmin());
   const renderLinkCard = link => `
@@ -1282,18 +1374,109 @@ function renderLinks() {
   initQuickLinkDrag();
 }
 
-function renderVoiceover() {
-  if (document.querySelector("#view-voiceover .voiceover-frame")) return;
-  document.querySelector("#view-voiceover").innerHTML = `
-    <section class="voiceover-panel">
-      <iframe
-        class="voiceover-frame"
-        title="Voiceover Automation"
-        src="https://translation-fb9z.onrender.com/"
-        loading="lazy"
-      ></iframe>
-    </section>
+function renderClients() {
+  document.querySelector("#view-clients").innerHTML = `
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Clients</h2>
+          <p class="muted">Manage active clients, project types, billing rates, and editor payouts.</p>
+        </div>
+        <button class="primary-button" data-action="add-client">${icon("plus")} Add Client</button>
+      </div>
+      <div class="client-list">
+        ${clients.length ? clients.map(client => `
+          <article class="client-card">
+            <div class="client-card-header">
+              <div><span class="label">Client</span><h3>${escapeAttr(client.name)}</h3></div>
+              <div class="icon-actions">
+                <button class="ghost-button" data-action="add-client-project" data-client="${escapeAttr(client.name)}">${icon("plus")} Project</button>
+                <button class="icon-action" data-action="edit-client" data-id="${escapeAttr(client.id)}" title="Edit client">${icon("pen")}</button>
+                <button class="icon-action danger-icon" data-action="delete-client" data-id="${escapeAttr(client.id)}" title="Delete client">${icon("trash")}</button>
+              </div>
+            </div>
+            <div class="client-rate-list">
+              ${(client.rates || []).length ? client.rates.map(rate => `
+                <div class="client-rate-item">
+                  <strong>${escapeAttr(rate.type)}</strong>
+                  <span>Client: $${Number(rate.invoiceRate || 0).toLocaleString()}${rateBillingMinutes(rate) ? ` / ${rateBillingMinutes(rate)} min` : " / project"}</span>
+                  <span>Editor: ₱${Number(rate.editorRate || 0).toLocaleString()}${rateBillingMinutes(rate) ? ` / ${rateBillingMinutes(rate)} min` : " / project"}</span>
+                </div>
+              `).join("") : `<p class="muted">No project types configured.</p>`}
+            </div>
+          </article>
+        `).join("") : `<div class="empty-state"><strong>No clients yet</strong><span>Add your first client to create projects.</span></div>`}
+      </div>
+    </div>
   `;
+}
+
+function addClientRateRow(rate = {}) {
+  const container = document.querySelector("#clientRateRows");
+  const row = document.createElement("div");
+  row.className = "client-rate-row";
+  row.innerHTML = `
+    <label>Project type<input data-rate-field="type" required value="${escapeAttr(rate.type || "")}" placeholder="e.g. Regular Edit" /></label>
+    <label>Client rate ($)<input data-rate-field="invoiceRate" required type="number" min="0" step="0.01" value="${Number(rate.invoiceRate || 0)}" /></label>
+    <label>Editor pay (₱)<input data-rate-field="editorRate" required type="number" min="0" step="0.01" value="${Number(rate.editorRate || 0)}" /></label>
+    <label>Billing<select data-rate-field="billing"><option value="video"${!rateBillingMinutes(rate) ? " selected" : ""}>Per project</option><option value="minutes"${rateBillingMinutes(rate) ? " selected" : ""}>Per custom minutes</option></select></label>
+    <label class="billing-minutes-field">Minutes per rate<input data-rate-field="billingMinutes" type="number" min="0.01" step="0.01" value="${rateBillingMinutes(rate) || 2}" /></label>
+    <button class="icon-action danger-icon remove-rate-row" type="button" title="Remove type">${icon("trash")}</button>
+  `;
+  row.querySelector(".remove-rate-row").onclick = () => row.remove();
+  const updateBillingField = () => {
+    const usesMinutes = row.querySelector("[data-rate-field='billing']").value === "minutes";
+    row.querySelector(".billing-minutes-field").classList.toggle("hidden", !usesMinutes);
+    row.querySelector("[data-rate-field='billingMinutes']").required = usesMinutes;
+  };
+  row.querySelector("[data-rate-field='billing']").onchange = updateBillingField;
+  updateBillingField();
+  container.appendChild(row);
+}
+
+function openClientModal(clientId = "") {
+  editingClientId = clientId || null;
+  const client = clients.find(item => String(item.id) === String(editingClientId));
+  const form = document.querySelector("#clientForm");
+  form.reset();
+  document.querySelector("#clientRateRows").innerHTML = "";
+  document.querySelector("#clientModalTitle").textContent = client ? "Edit Client" : "Add Client";
+  document.querySelector("#clientSubmitButton").textContent = client ? "Save Client" : "Add Client";
+  form.elements.name.value = client?.name || "";
+  (client?.rates?.length ? client.rates : [{}]).forEach(addClientRateRow);
+  document.querySelector("#clientModal").classList.add("open");
+}
+
+function closeClientModal() {
+  editingClientId = null;
+  document.querySelector("#clientModal").classList.remove("open");
+}
+
+function openProjectDetails(projectId) {
+  const project = projects.find(item => String(item.id) === String(projectId));
+  if (!project) return;
+  detailsProjectId = project.id;
+  document.querySelector("#projectDetailsTitle").textContent = project.project || "Untitled Project";
+  document.querySelector("#projectDetailsSubtitle").textContent = `${project.client || "No client"} · ${project.type || "No type"}`;
+  document.querySelector("#projectDetailsBody").innerHTML = `
+    <div><span class="label">Client</span><strong>${escapeAttr(project.client || "-")}</strong></div>
+    <div><span class="label">Project type</span><strong>${escapeAttr(project.type || "-")}</strong></div>
+    <div><span class="label">Status</span>${statusPill(project.status || "To Do")}</div>
+    <div><span class="label">Editor</span>${editorChip(project.editor)}</div>
+    ${isAdmin() && currentView !== "viewas" ? `<div><span class="label">Client rate</span><strong>${invoiceRate(project)}</strong></div>` : ""}
+    <div><span class="label">Editor payout</span><strong>₱${editorPay(project).toLocaleString()}</strong></div>
+    <div><span class="label">Script</span>${linkCell(project.scriptLink)}</div>
+    <div><span class="label">Raw files</span>${linkCell(project.rawLink)}</div>
+    <div class="details-wide"><span class="label">Deliverable</span>${project.deliverable ? deliverableCell(project) : `<span class="muted">None</span>`}</div>
+    <div class="details-wide"><span class="label">Notes</span><p>${escapeAttr(project.notes || "No notes")}</p></div>
+  `;
+  document.querySelector("#editProjectFromDetails").classList.toggle("hidden", !isAdmin() || currentView === "viewas");
+  document.querySelector("#projectDetailsModal").classList.add("open");
+}
+
+function closeProjectDetails() {
+  detailsProjectId = null;
+  document.querySelector("#projectDetailsModal").classList.remove("open");
 }
 
 function renderEditors() {
@@ -1380,25 +1563,22 @@ function renderTrash() {
 }
 
 function renderAll() {
-  const active = activeProjects();
   renderDashboard();
-  renderClientPage("#view-md", "Mehdi & Deniss Workspace", active.filter(p => p.client === "Mehdi" || p.client === "Deniss"));
-  renderClientPage("#view-nicolas", "Nicolas Workspace", active.filter(p => p.client === "Nicolas"));
+  renderClients();
   renderEditors();
   renderWorkspace(currentUser || "Essi", "#view-workspace");
-  renderVoiceover();
   renderLinks();
   renderTrash();
   renderViewAs();
 }
 
 function setView(view) {
-  if (!isAdmin() && !["workspace", "voiceover", "links", "trash"].includes(view)) view = "workspace";
+  if (!isAdmin() && !["workspace", "links", "trash"].includes(view)) view = "workspace";
   currentView = view;
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active-view"));
   document.querySelector(`#view-${view}`).classList.add("active-view");
   document.querySelectorAll(".nav-item").forEach(item => item.classList.toggle("active", item.dataset.view === view));
-  const labels = { dashboard: "Dashboard", md: "Mehdi & Deniss", nicolas: "Nicolas", editors: "Editors", workspace: `${currentUser || "Essi"} Workspace`, voiceover: "Voiceover Automation", links: "Quick Links", trash: "Trash", viewas: "View As Editor" };
+  const labels = { dashboard: "Dashboard", clients: "Clients", editors: "Editors", workspace: `${currentUser || "Essi"} Workspace`, links: "Quick Links", trash: "Trash", viewas: "View As Editor" };
   document.querySelector("#page-title").textContent = labels[view];
   updateTopbar(view);
 }
@@ -1443,24 +1623,19 @@ function configureProjectForm(clientPreset = "") {
   const editorSelect = form.elements.editor;
   const typeSelect = form.elements.type;
   const editingProject = projects.find(project => String(project.id) === String(editingProjectId));
-  const selectedClient = editingProject?.client || clientPreset || clientSelect.value || "Mehdi";
-  const isNicolasProject = selectedClient === "Nicolas";
+  const selectedClient = editingProject?.client || clientPreset || clientSelect.value || clients[0]?.name || "";
   const editorLockedToCurrentUser = !isAdmin();
-
-  [...clientSelect.options].forEach(option => {
-    option.disabled = !isAdmin() && option.value !== "Nicolas";
-  });
+  const clientNames = clients.map(client => client.name);
+  if (editingProject?.client && !clientNames.includes(editingProject.client)) clientNames.push(editingProject.client);
+  clientSelect.innerHTML = clientNames.map(name => `<option value="${escapeAttr(name)}">${escapeAttr(name)}</option>`).join("");
+  clientSelect.value = selectedClient;
+  const configuredTypes = clientByName(selectedClient)?.rates?.map(rate => rate.type) || [];
+  if (editingProject?.type && !configuredTypes.includes(editingProject.type)) configuredTypes.push(editingProject.type);
+  typeSelect.innerHTML = configuredTypes.map(type => `<option value="${escapeAttr(type)}">${escapeAttr(type)}</option>`).join("");
   [...editorSelect.options].forEach(option => {
     const value = option.value;
     const allowedForClient = value === "Unassigned" || allowedEditors(selectedClient).includes(value);
     option.disabled = (!isAdmin() && value !== currentUser) || !allowedForClient;
-  });
-  [...typeSelect.options].forEach(option => {
-    const nicolasType = ["Easy", "Hard"].includes(option.value);
-    const denissType = ["Regular Edit", "Long Story", "Translation"].includes(option.value);
-    const mehdiType = option.value === "Regular Edit";
-    option.disabled = isNicolasProject ? !nicolasType : selectedClient === "Deniss" ? !denissType : !mehdiType;
-    option.hidden = !isAdmin() && isNicolasProject ? !nicolasType : false;
   });
 
   if (editingProject) {
@@ -1475,26 +1650,19 @@ function configureProjectForm(clientPreset = "") {
   } else if (clientPreset) {
     clientSelect.value = clientPreset;
   }
-  if (!isAdmin() && !editingProject) {
-    clientSelect.value = "Nicolas";
-    editorSelect.value = currentUser;
-  }
-  if (isNicolasProject && !["Easy", "Hard"].includes(typeSelect.value)) typeSelect.value = "Easy";
-  if (selectedClient === "Deniss" && !["Regular Edit", "Long Story", "Translation"].includes(typeSelect.value)) typeSelect.value = "Regular Edit";
-  if (selectedClient === "Mehdi" && typeSelect.value !== "Regular Edit") typeSelect.value = "Regular Edit";
+  if (!isAdmin() && !editingProject) editorSelect.value = currentUser;
   if (![...editorSelect.options].some(option => option.value === editorSelect.value && !option.disabled)) {
     editorSelect.value = isAdmin() ? "Unassigned" : currentUser;
   }
 
-  const modalTitle = isNicolasProject ? "Add Nicolas Project" : ["Mehdi", "Deniss"].includes(selectedClient) ? "Add Mehdi & Deniss Project" : "Add Project";
+  const modalTitle = selectedClient ? `Add ${selectedClient} Project` : "Add Project";
   document.querySelector("#modalTitle").textContent = editingProject ? "Edit Project" : modalTitle;
   document.querySelector("#projectSubmitButton").textContent = editingProject ? "Save Changes" : "Create Project";
   document.querySelectorAll("[data-form-field]").forEach(field => {
     const name = field.dataset.formField;
     const shouldHide =
-      (name === "client" && (isNicolasProject || !isAdmin())) ||
-      (isNicolasProject && ["script", "raw"].includes(name)) ||
-      (name === "duration" && !(isAdmin() && clientSelect.value === "Deniss" && typeSelect.value === "Long Story")) ||
+      (name === "client" && !isAdmin()) ||
+      (name === "duration" && !rateBillingMinutes(rateForProject({ client: clientSelect.value, type: typeSelect.value }))) ||
       (editorLockedToCurrentUser && name === "editor");
     field.classList.toggle("hidden", shouldHide);
   });
@@ -1537,14 +1705,15 @@ function openLinkModal(linkId = "") {
   editingLinkId = linkId || null;
   const form = document.querySelector("#linkForm");
   const link = quickLinks.find(item => String(item.id) === String(editingLinkId));
-  const validLinkClients = ["Mehdi", "Deniss", "Nicolas", "Private"];
+  const validLinkClients = [...clients.map(client => client.name), "Private"];
+  form.elements.client.innerHTML = validLinkClients.map(name => `<option value="${escapeAttr(name)}">${escapeAttr(name)}</option>`).join("");
   form.reset();
   document.querySelector("#linkModalTitle").textContent = link ? "Edit Link" : "Add Link";
   document.querySelector("#linkSubmitButton").textContent = link ? "Save Link" : "Add Link";
   if (link) {
     form.elements.title.value = link.name || "";
     form.elements.description.value = link.notes || "";
-    form.elements.client.value = validLinkClients.includes(link.client) ? link.client : "Mehdi";
+    form.elements.client.value = validLinkClients.includes(link.client) ? link.client : validLinkClients[0];
     form.elements.url.value = link.url || "";
   }
   document.querySelector("#linkModal").classList.add("open");
@@ -1614,6 +1783,36 @@ document.addEventListener("click", async (event) => {
   const action = actionButtonEl?.dataset.action;
   if (action === "mark-project") return;
 
+  if (action === "view-project") {
+    openProjectDetails(actionButtonEl.dataset.id);
+    return;
+  }
+
+  if (action === "add-client") {
+    openClientModal();
+    return;
+  }
+
+  if (action === "add-client-project") {
+    openModal(actionButtonEl.dataset.client);
+    return;
+  }
+
+  if (action === "edit-client") {
+    openClientModal(actionButtonEl.dataset.id);
+    return;
+  }
+
+  if (action === "delete-client") {
+    const client = clients.find(item => String(item.id) === String(actionButtonEl.dataset.id));
+    if (!client || !confirm(`Delete ${client.name}? Existing projects will be kept.`)) return;
+    clients.splice(clients.indexOf(client), 1);
+    await deleteClientRemote(client);
+    renderAll();
+    setView("clients");
+    return;
+  }
+
   if (action === "preview-deliverable") {
     openDeliverablePreview(actionButtonEl.dataset.id);
     return;
@@ -1678,6 +1877,13 @@ document.addEventListener("click", async (event) => {
   const payoutFilterCard = event.target.closest("[data-payout-filter]");
   if (payoutFilterCard) {
     dashboardBreakdownMode = "payout";
+    renderAll();
+    setView("dashboard");
+  }
+
+  const invoiceModeCard = event.target.closest("[data-invoice-mode]");
+  if (invoiceModeCard && !event.target.closest("select")) {
+    dashboardBreakdownMode = "invoice";
     renderAll();
     setView("dashboard");
   }
@@ -1838,6 +2044,13 @@ document.addEventListener("change", async (event) => {
     setView("dashboard");
   }
 
+  if (event.target.dataset.action === "invoice-client-filter") {
+    dashboardBreakdownMode = "invoice";
+    dashboardInvoiceFilter = event.target.value || "all";
+    renderAll();
+    setView("dashboard");
+  }
+
   if (event.target.dataset.action === "deliverable-input") {
     await saveDeliverableInput(event.target);
   }
@@ -1879,6 +2092,18 @@ document.querySelector("#closeEditorModal").onclick = closeEditorModal;
 document.querySelector("#cancelEditorModal").onclick = closeEditorModal;
 document.querySelector("#closeLinkModal").onclick = closeLinkModal;
 document.querySelector("#cancelLinkModal").onclick = closeLinkModal;
+document.querySelector("#closeClientModal").onclick = closeClientModal;
+document.querySelector("#cancelClientModal").onclick = closeClientModal;
+document.querySelector("#addRateRow").onclick = () => addClientRateRow();
+document.querySelector("#closeProjectDetails").onclick = closeProjectDetails;
+document.querySelector("#closeProjectDetailsButton").onclick = closeProjectDetails;
+document.querySelector("#editProjectFromDetails").onclick = () => {
+  const project = projects.find(item => String(item.id) === String(detailsProjectId));
+  if (!project) return;
+  editingProjectId = project.id;
+  closeProjectDetails();
+  openModal(project.client);
+};
 document.querySelector("#closeDeliverablePreview").onclick = closeDeliverablePreview;
 document.querySelector("#deliverablePreviewModal").addEventListener("click", event => {
   if (event.target.id === "deliverablePreviewModal") closeDeliverablePreview();
@@ -1902,6 +2127,45 @@ document.querySelector("#loginForm").onsubmit = (event) => {
 };
 document.querySelector("#projectForm").elements.client.onchange = () => configureProjectForm(document.querySelector("#projectForm").elements.client.value);
 document.querySelector("#projectForm").elements.type.onchange = updateDurationField;
+document.querySelector("#clientForm").onsubmit = async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const name = form.elements.name.value.trim();
+  const existing = clients.find(item => String(item.id) === String(editingClientId));
+  if (!name || clients.some(client => client !== existing && client.name.toLowerCase() === name.toLowerCase())) {
+    alert("Please use a unique client name.");
+    return;
+  }
+  const rates = [...document.querySelectorAll("#clientRateRows .client-rate-row")].map(row => ({
+    type: row.querySelector("[data-rate-field='type']").value.trim(),
+    invoiceRate: Number(row.querySelector("[data-rate-field='invoiceRate']").value || 0),
+    editorRate: Number(row.querySelector("[data-rate-field='editorRate']").value || 0),
+    billing: row.querySelector("[data-rate-field='billing']").value,
+    billingMinutes: row.querySelector("[data-rate-field='billing']").value === "minutes"
+      ? Number(row.querySelector("[data-rate-field='billingMinutes']").value || 1)
+      : 0
+  })).filter(rate => rate.type);
+  if (!rates.length || new Set(rates.map(rate => rate.type.toLowerCase())).size !== rates.length) {
+    alert("Add at least one project type and do not repeat a type name.");
+    return;
+  }
+  const client = existing || { id: `local-${crypto.randomUUID()}`, name, rates: [] };
+  const previousName = client.name;
+  client.name = name;
+  client.rates = rates;
+  if (!existing) clients.push(client);
+  if (existing && previousName !== name) {
+    for (const project of projects.filter(item => item.client === previousName)) {
+      project.client = name;
+      await saveProjectRemote(project);
+    }
+    quickLinks.filter(link => link.client === previousName).forEach(link => { link.client = name; saveQuickLinkRemote(link); });
+  }
+  await saveClientRemote(client);
+  closeClientModal();
+  renderAll();
+  setView("clients");
+};
 document.querySelector("#editorForm").onsubmit = async (event) => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.currentTarget).entries());
@@ -1965,13 +2229,10 @@ document.querySelector("#linkForm").onsubmit = (event) => {
 document.querySelector("#projectForm").onsubmit = async (event) => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.currentTarget).entries());
-  if (!isAdmin() && data.client !== "Nicolas") return;
-  const selectedClient = !isAdmin() ? "Nicolas" : data.client;
-  const isNicolasProject = selectedClient === "Nicolas";
-  if (isNicolasProject && !["Easy", "Hard"].includes(data.type)) return;
-  if (selectedClient === "Deniss" && !["Regular Edit", "Long Story", "Translation"].includes(data.type)) return;
-  if (selectedClient === "Mehdi" && data.type !== "Regular Edit") return;
-  if (!isNicolasProject && ["Easy", "Hard"].includes(data.type)) return;
+  if (!isAdmin()) return;
+  const selectedClient = data.client;
+  const configuredRate = rateForProject({ client: selectedClient, type: data.type });
+  if (!clientByName(selectedClient) || !configuredRate) return;
   const existingProject = projects.find(item => String(item.id) === String(editingProjectId));
   const previousEditor = existingProject?.editor || "";
   const project = existingProject || {
@@ -1984,13 +2245,13 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
     client: selectedClient,
     project: data.project,
     type: data.type,
-    script: !isAdmin() || isNicolasProject ? false : Boolean(data.script),
-    raw: !isAdmin() || isNicolasProject ? false : Boolean(data.raw),
-    scriptLink: !isAdmin() || isNicolasProject ? "" : data.script,
-    rawLink: !isAdmin() || isNicolasProject ? "" : data.raw,
+    script: Boolean(data.script),
+    raw: Boolean(data.raw),
+    scriptLink: data.script,
+    rawLink: data.raw,
     notes: data.notes || "",
-    duration: selectedClient === "Deniss" && data.type === "Long Story" ? parseDuration(data.duration) : 0,
-    editor: !isAdmin() ? currentUser : data.editor === "Unassigned" ? "" : data.editor
+    duration: rateBillingMinutes(configuredRate) ? parseDuration(data.duration) : 0,
+    editor: data.editor === "Unassigned" ? "" : data.editor
   });
   if (!existingProject && isDuplicateProject(project)) {
     alert("This project already exists. Duplicate entry was not added.");
@@ -1998,7 +2259,6 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
   }
   if (!existingProject && !isDuplicateProject(project)) projects.unshift(project);
   const shouldNotifyAssigned = isAdmin() && project.editor && previousEditor !== project.editor;
-  const shouldNotifyAddedNicolas = !existingProject && selectedClient === "Nicolas" && !isAdmin();
   const shouldNotifyUnassignedAdded = isAdmin() && !existingProject && !project.editor;
   event.currentTarget.reset();
   closeModal();
@@ -2006,9 +2266,6 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
   setView(currentView);
   if (shouldNotifyAssigned) {
     sendDiscordUpdate("assigned", project, currentUser || "Essi", previousEditor);
-  }
-  if (shouldNotifyAddedNicolas) {
-    sendDiscordUpdate("add_nicolas", project, currentUser || project.editor || "Essi");
   }
   if (shouldNotifyUnassignedAdded) {
     sendDiscordUpdate("unassigned_added", project, currentUser || "Essi");

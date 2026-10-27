@@ -487,21 +487,6 @@ body.night-mode .theme-toggle-knob::before {
 .view { display: none; }
 .active-view { display: block; }
 
-.voiceover-panel {
-  display: grid;
-  gap: 16px;
-}
-
-
-.voiceover-frame {
-  width: 100%;
-  min-height: calc(100vh - 132px);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--panel);
-  box-shadow: var(--shadow);
-}
-
 .grid {
   display: grid;
   gap: 16px;
@@ -1546,6 +1531,132 @@ body.preview-open {
   z-index: 1001;
 }
 
+.project-name-button {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  color: var(--text);
+  background: transparent;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-name-button:hover { color: var(--green); text-decoration: underline; }
+
+.dashboard-client-select {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  margin-top: 18px;
+  padding: 6px 34px 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text);
+  background: var(--panel-soft);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dashboard-client-select option {
+  color: var(--text);
+  background: var(--panel);
+}
+
+.filter-caption {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+body:has(.modal.open) {
+  overflow: hidden;
+}
+
+.modal.open {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.client-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.client-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 18px;
+  background: var(--panel);
+}
+
+.client-card-header,
+.rate-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.client-card h3 { margin: 4px 0 0; font-size: 24px; }
+.icon-actions { display: flex; align-items: center; gap: 8px; }
+.client-rate-list { display: grid; gap: 8px; margin-top: 16px; }
+.client-rate-item {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+.client-rate-item span { color: var(--muted); font-size: 13px; }
+.client-form, .rate-editor { display: grid; gap: 14px; }
+.client-modal-panel { width: min(1100px, 100%); }
+.client-form,
+.client-form label,
+.client-rate-row label,
+.client-form input,
+.client-form select {
+  min-width: 0;
+  width: 100%;
+}
+.rate-editor-header { margin-top: 18px; }
+.rate-editor-header small { display: block; color: var(--muted); margin-top: 3px; }
+.client-rate-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.35fr) minmax(120px, 1fr) minmax(120px, 1fr) minmax(155px, 1fr) minmax(110px, .75fr) 40px;
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.project-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+.project-details-grid > div {
+  min-height: 78px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+.project-details-grid .label { display: block; margin-bottom: 8px; }
+.details-wide { grid-column: 1 / -1; }
+.details-wide p { margin: 0; white-space: pre-wrap; }
+
+body.night-mode .client-card { background: var(--panel); color: var(--text); }
+body.night-mode .project-details-grid > div { background: var(--panel-soft); color: var(--text); }
+
 .modal-header,
 .modal-actions {
   display: flex;
@@ -1608,6 +1719,11 @@ label {
   }
   .cards, .workspace-summary, .quick-links, .two-col { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
+  .client-rate-row { grid-template-columns: 1fr 1fr; }
+  .client-rate-row .remove-rate-row { grid-column: 2; justify-self: end; }
+  .client-rate-item { grid-template-columns: 1fr; }
+  .project-details-grid { grid-template-columns: 1fr; }
+  .details-wide { grid-column: auto; }
 }
 
 @media (max-width: 640px) {

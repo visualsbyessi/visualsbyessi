@@ -49,11 +49,9 @@
 
         <nav class="nav-group" aria-label="Main navigation">
           <button class="nav-item admin-only active" data-view="dashboard"><span class="nav-icon">⌂</span><span>Dashboard</span></button>
-          <button class="nav-item admin-only" data-view="md"><span class="nav-icon">▣</span><span>Mehdi & Deniss</span></button>
-          <button class="nav-item admin-only" data-view="nicolas"><span class="nav-icon">◆</span><span>Nicolas</span></button>
+          <button class="nav-item admin-only" data-view="clients"><span class="nav-icon">▣</span><span>Clients</span></button>
           <button class="nav-item admin-only" data-view="editors"><span class="nav-icon">◎</span><span>Editors</span></button>
           <button class="nav-item" data-view="workspace"><span class="nav-icon">◉</span><span>My Workspace</span></button>
-          <button class="nav-item" data-view="voiceover"><span class="nav-icon">◌</span><span>Voiceover Automation</span></button>
           <button class="nav-item" data-view="links"><span class="nav-icon">↗</span><span>Quick Links</span></button>
           <button class="nav-item" data-view="trash"><span class="nav-icon">⌫</span><span>Trash</span></button>
           <button class="nav-item admin-only" data-view="viewas"><span class="nav-icon">◎</span><span>View As Editor</span></button>
@@ -84,11 +82,9 @@
         </header>
 
         <section id="view-dashboard" class="view active-view"></section>
-        <section id="view-md" class="view"></section>
-        <section id="view-nicolas" class="view"></section>
+        <section id="view-clients" class="view"></section>
         <section id="view-editors" class="view"></section>
         <section id="view-workspace" class="view"></section>
-        <section id="view-voiceover" class="view"></section>
         <section id="view-links" class="view"></section>
         <section id="view-trash" class="view"></section>
         <section id="view-viewas" class="view"></section>
@@ -234,6 +230,50 @@
             <button type="submit" class="primary-button" id="linkSubmitButton">Add Link</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <div class="modal" id="clientModal" aria-hidden="true">
+      <div class="modal-panel client-modal-panel" role="dialog" aria-modal="true" aria-labelledby="clientModalTitle">
+        <div class="modal-header">
+          <h2 id="clientModalTitle">Add Client</h2>
+          <button class="icon-button" id="closeClientModal" aria-label="Close">×</button>
+        </div>
+        <form id="clientForm" class="client-form">
+          <label>
+            Client name
+            <input name="name" required placeholder="Client name" />
+          </label>
+          <div class="rate-editor-header">
+            <div>
+              <strong>Project types and rates</strong>
+              <small>Set what the client pays and what the editor earns.</small>
+            </div>
+            <button class="ghost-button" id="addRateRow" type="button">+ Add type</button>
+          </div>
+          <div id="clientRateRows" class="rate-editor"></div>
+          <div class="modal-actions">
+            <button type="button" class="ghost-button" id="cancelClientModal">Cancel</button>
+            <button type="submit" class="primary-button" id="clientSubmitButton">Add Client</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal" id="projectDetailsModal" aria-hidden="true">
+      <div class="modal-panel project-details-panel" role="dialog" aria-modal="true" aria-labelledby="projectDetailsTitle">
+        <div class="modal-header">
+          <div>
+            <h2 id="projectDetailsTitle">Project details</h2>
+            <p class="muted" id="projectDetailsSubtitle"></p>
+          </div>
+          <button class="icon-button" id="closeProjectDetails" aria-label="Close">×</button>
+        </div>
+        <div id="projectDetailsBody" class="project-details-grid"></div>
+        <div class="modal-actions">
+          <button type="button" class="ghost-button" id="closeProjectDetailsButton">Close</button>
+          <button type="button" class="primary-button admin-only" id="editProjectFromDetails">Edit Project</button>
+        </div>
       </div>
     </div>
 
