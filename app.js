@@ -1302,7 +1302,7 @@ function renderClientPage(id, title, rows) {
 function renderWorkspace(editor = activeEditor, target = "#view-workspace") {
   const clientRows = activeProjects().filter(p => allowedEditors(p.client).includes(editor));
   const accessibleClients = clients.filter(client => allowedEditors(client.name).includes(editor));
-  const canAddProject = target === "#view-workspace" && accessibleClients.length > 0;
+  const canAddProject = isAdmin() && target === "#view-workspace" && accessibleClients.length > 0;
   const defaultAddClient = accessibleClients[0]?.name || "";
   const modeRows = workspaceMode === "all"
     ? clientRows
@@ -1846,7 +1846,7 @@ function configureProjectForm(clientPreset = "") {
   document.querySelectorAll("[data-form-field]").forEach(field => {
     const name = field.dataset.formField;
     const shouldHide =
-      (name === "client" && !isAdmin() && clientNames.length <= 1) ||
+      (name === "client" && !isAdmin()) ||
       (name === "duration" && !rateBillingMinutes(rateForProject({ client: clientSelect.value, type: typeSelect.value }))) ||
       (editorLockedToCurrentUser && name === "editor");
     field.classList.toggle("hidden", shouldHide);
@@ -2449,11 +2449,11 @@ document.querySelector("#linkForm").onsubmit = (event) => {
 document.querySelector("#projectForm").onsubmit = async (event) => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.currentTarget).entries());
-  const selectedClient = data.client;
-  if (!isAdmin() && !allowedEditors(selectedClient).includes(currentUser)) {
-    alert("You do not have access to add projects for this client.");
+  if (!isAdmin()) {
+    alert("Only the admin can add projects.");
     return;
   }
+  const selectedClient = data.client;
   const configuredRate = rateForProject({ client: selectedClient, type: data.type });
   if (!clientByName(selectedClient) || !configuredRate) return;
   const existingProject = projects.find(item => String(item.id) === String(editingProjectId));
@@ -2474,14 +2474,14 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
     rawLink: data.raw,
     notes: data.notes || "",
     duration: rateBillingMinutes(configuredRate) ? parseDuration(data.duration) : 0,
-    editor: isAdmin() ? (data.editor === "Unassigned" ? "" : data.editor) : currentUser
+    editor: data.editor === "Unassigned" ? "" : data.editor
   });
   if (!existingProject && isDuplicateProject(project)) {
     alert("This project already exists. Duplicate entry was not added.");
     return;
   }
   if (!existingProject && !isDuplicateProject(project)) projects.unshift(project);
-  const shouldNotifyAssigned = project.editor && previousEditor !== project.editor;
+  const shouldNotifyAssigned = isAdmin() && project.editor && previousEditor !== project.editor;
   const shouldNotifyUnassignedAdded = isAdmin() && !existingProject && !project.editor;
   event.currentTarget.reset();
   closeModal();
