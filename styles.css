@@ -1797,17 +1797,25 @@ body.night-mode .native-invoice-form .invoice-section-title { color: var(--text)
   justify-items: center;
   gap: 22px;
   padding: 4px 12px 24px;
+  grid-auto-rows: max-content;
+  align-content: start;
 }
 .contract-form-panel details { border: 1px solid var(--line); border-radius: 12px; background: var(--panel-soft); overflow: hidden; }
 .contract-form-panel details + details { margin-top: 12px; }
 .contract-form-panel summary { cursor: pointer; padding: 14px 16px; color: var(--text); font-weight: 800; }
 .contract-form-panel details[open] summary { border-bottom: 1px solid var(--line); }
 .contract-form-panel details .form-grid { padding: 16px; }
+.contract-form-panel details .form-grid { grid-template-columns: minmax(0, 1fr); }
+.contract-form-panel input,
+.contract-form-panel select,
+.contract-form-panel textarea { width: 100%; min-width: 0; }
 .contract-form-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .contract-saved-list { margin-top: 18px; }
 .contract-page {
   width: min(100%, 640px);
   aspect-ratio: 8.5 / 11;
+  height: auto;
+  align-self: start;
   flex: none;
   display: flex;
   flex-direction: column;
@@ -1849,9 +1857,19 @@ body.night-mode .native-invoice-form .invoice-section-title { color: var(--text)
 .signature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-top: 16px; }
 .signature-grid > div { display: grid; }
 .typed-signature { min-height: 32px; border-bottom: 1px solid #17233f; color: #111; font: 22px cursive; }
+.typed-signature { display: flex; align-items: flex-end; }
+.signature-image { display: block; max-width: 100%; max-height: 38px; object-fit: contain; object-position: left bottom; }
+.signature-written { font: 22px cursive; }
+.signature-placeholder { display: block; min-height: 30px; }
 .signature-grid strong { min-height: 18px; padding-top: 5px; border-bottom: 1px solid #d9dde5; }
 .signature-grid i { margin-bottom: 5px; color: #9299a6; font-size: 6px; font-style: normal; }
 body.night-mode .contract-page { background: #fff; color: #17233f; }
+.signature-control { display: grid; gap: 9px; padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.signature-control canvas { width: 100%; height: 112px; border: 1px solid var(--line); border-radius: 9px; background: #fff; cursor: crosshair; touch-action: none; }
+.signature-control-actions { display: flex; gap: 9px; }
+.signature-upload { position: relative; overflow: hidden; cursor: pointer; }
+.signature-upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.signature-control small { color: var(--muted); font-weight: 400; }
 .document-list { display: grid; gap: 10px; }
 .document-row {
   display: grid;
