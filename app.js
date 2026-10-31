@@ -1706,39 +1706,74 @@ function renderInvoices() {
   updateInvoicePreview();
 }
 
+function contractText(value, fallback = "") {
+  return escapeAttr(String(value || fallback)).replace(/\n/g, "<br>");
+}
+
+function readContractDraft(form = document.querySelector("#contractMakerForm")) {
+  return form ? Object.fromEntries(new FormData(form).entries()) : null;
+}
+
+function contractHeader(contract) {
+  return `<header class="contract-doc-header"><strong>${contractText(contract.providerName, "Visuals by Essi")}</strong><span>Creative Marketing Services</span><b>SERVICE AGREEMENT</b></header>`;
+}
+
+function contractFooter(page) {
+  return `<footer>Confidential - Creative Marketing Agency Agreement <span>Page ${page}</span></footer>`;
+}
+
+function contractSection(number, title, body) {
+  return `<section class="contract-doc-section"><h3>${number ? `${number}. ` : ""}${title}</h3>${body}</section>`;
+}
+
+function contractPreviewHtml(c) {
+  const header = contractHeader(c);
+  return `<article class="contract-page">${header}<div class="contract-cover"><h1>${contractText(c.title, "CREATIVE MARKETING AGENCY")}<em>SERVICE AGREEMENT</em></h1><p>${contractText(c.subtitle, "Video Editing and Creative Services")}</p></div>
+    ${contractSection("", "AGREEMENT OVERVIEW", `<dl class="contract-facts"><dt>Agreement Date</dt><dd>${contractText(c.agreementDate)}</dd><dt>Effective Date</dt><dd>${contractText(c.effectiveDate)}</dd><dt>Contract Reference #</dt><dd>${contractText(c.reference, "0001")}</dd><dt>Agreement Term</dt><dd>${contractText(c.term, "Month-to-month")}</dd></dl>`)}
+    <div class="contract-party-grid"><div><b>SERVICE PROVIDER</b><strong>${contractText(c.providerName)}</strong><small>${contractText(c.providerAddress)}</small><small>${contractText(c.providerEmail)}</small><small>${contractText(c.providerPhone)}</small></div><div><b>CLIENT</b><strong>${contractText(c.clientName || c.client)}</strong><small>${contractText(c.clientAddress)}</small><small>${contractText(c.clientEmail)}</small><small>${contractText(c.clientPhone)}</small></div></div>
+    ${contractSection("1", "SCOPE OF SERVICES", `<p>${contractText(c.scopeIntro)}</p><table><thead><tr><th>DELIVERABLE</th><th>QTY / TIMELINE</th><th>NOTES</th></tr></thead><tbody><tr><td>${contractText(c.deliverable)}</td><td>${contractText(c.quantityTimeline)}</td><td>${contractText(c.deliverableNotes)}</td></tr></tbody></table>`)}${contractFooter(1)}</article>
+    <article class="contract-page">${header}${contractSection("2", "PRODUCTION DELIVERABLES", `<p>${contractText(c.productionTerms)}</p>`)}${contractSection("3", "REVISIONS & TURNAROUND POLICY", `<table class="contract-key-table"><tr><th>Revision Rounds</th><td>${contractText(c.revisionRounds)}</td></tr><tr><th>Turnaround Time</th><td>${contractText(c.turnaround)}</td></tr><tr><th>Asset Confirmation</th><td>${contractText(c.assetConfirmation)}</td></tr></table>`)}${contractFooter(2)}</article>
+    <article class="contract-page">${header}${contractSection("4", "PAYMENT TERMS", `<table class="contract-key-table"><tr><th>Service Fee</th><td>${contractText(c.fee)}</td></tr><tr><th>Invoice Schedule</th><td>${contractText(c.invoiceSchedule)}</td></tr><tr><th>Payment Method</th><td>${contractText(c.paymentMethod)}</td></tr><tr><th>Service Suspension</th><td>${contractText(c.serviceSuspension)}</td></tr></table>`)}${contractSection("5", "CLIENT RESPONSIBILITIES", `<p>${contractText(c.clientResponsibilities)}</p>`)}${contractSection("6", "INTELLECTUAL PROPERTY & OWNERSHIP", `<p>${contractText(c.ownershipTerms)}</p>`)}${contractFooter(3)}</article>
+    <article class="contract-page">${header}${contractSection("7", "CONFIDENTIALITY", `<p>${contractText(c.confidentiality)}</p>`)}${contractSection("8", "TERM & TERMINATION", `<table class="contract-key-table"><tr><th>Term</th><td>${contractText(c.termDetails)}</td></tr><tr><th>Notice Period</th><td>${contractText(c.noticePeriod)}</td></tr><tr><th>Immediate Termination</th><td>${contractText(c.immediateTermination)}</td></tr></table>`)}${contractSection("9", "LIMITATION OF LIABILITY", `<p>${contractText(c.liability)}</p>`)}${contractSection("10", "DISPUTE RESOLUTION & GOVERNING LAW", `<p>${contractText(c.governingLaw)}</p>`)}${contractFooter(4)}</article>
+    <article class="contract-page">${header}${contractSection("11", "GENERAL PROVISIONS", `<p>${contractText(c.generalProvisions)}</p>`)}<section class="contract-signatures"><h3>SIGNATURES</h3><p>By signing below, both parties agree to the terms and conditions in this Service Agreement.</p><div class="signature-grid"><div><span class="typed-signature">${contractText(c.providerSignature)}</span><i>Signature</i><strong>${contractText(c.providerPrintedName)}</strong><i>Printed Name</i><strong>${contractText(c.providerTitle)}</strong><i>Title</i><strong>${contractText(c.providerSignDate)}</strong><i>Date</i></div><div><span class="typed-signature">${contractText(c.clientSignature)}</span><i>Signature</i><strong>${contractText(c.clientPrintedName)}</strong><i>Printed Name</i><strong>${contractText(c.clientTitle)}</strong><i>Title</i><strong>${contractText(c.clientSignDate)}</strong><i>Date</i></div></div></section>${contractFooter(5)}</article>`;
+}
+
+function updateContractPreview() {
+  const preview = document.querySelector("#contractLivePreview");
+  const contract = readContractDraft();
+  if (preview && contract) preview.innerHTML = contractPreviewHtml(contract);
+}
+
+function printContract(contract) {
+  const popup = window.open("", "_blank", "width=1000,height=900");
+  if (!popup) return alert("Please allow popups to download the contract PDF.");
+  popup.document.write(`<!doctype html><html><head><title>${escapeAttr(contract.title || "Service Agreement")}</title><style>${contractPrintStyles()}</style></head><body>${contractPreviewHtml(contract)}<script>window.onload=()=>window.print()<\/script></body></html>`);
+  popup.document.close();
+}
+
+function contractPrintStyles() {
+  return `@page{size:Letter portrait;margin:0}*{box-sizing:border-box}body{margin:0;background:#fff;color:#17233f;font:10px Arial,sans-serif}.contract-page{width:8.5in;height:11in;padding:.55in .72in .5in;display:flex;flex-direction:column;page-break-after:always;overflow:hidden}.contract-page:last-child{page-break-after:auto}.contract-doc-header{display:flex;align-items:center;gap:8px;border-bottom:1px solid #ddd;padding-bottom:9px;margin-bottom:24px}.contract-doc-header strong{font-size:10px}.contract-doc-header span{color:#999}.contract-doc-header b{margin-left:auto;color:#c5a23b}.contract-cover{text-align:center;margin:18px 0 28px}.contract-cover h1{font-size:25px;margin:0}.contract-cover h1 em{display:block;color:#c5a23b;font-style:normal}.contract-cover p{font-style:italic;color:#666}.contract-doc-section{margin:0 0 20px}.contract-doc-section h3,.contract-signatures h3{font-size:12px;border-bottom:1px solid #c5a23b;padding-bottom:8px;margin:0 0 14px}.contract-doc-section p{line-height:1.45}.contract-facts{display:grid;grid-template-columns:150px 1fr;gap:5px;margin:0}.contract-facts dt{font-weight:700}.contract-facts dd{margin:0;border-bottom:1px solid #ddd}.contract-party-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0 28px}.contract-party-grid>div{display:grid;gap:4px;padding:12px;background:#f5f6f8}.contract-party-grid b{font-size:9px}.contract-party-grid small{color:#666}table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:0}th,td{padding:8px;border:1px solid #d9dde5;text-align:left;vertical-align:top;white-space:normal}thead th,.contract-key-table th{background:#17233f;color:white}.contract-key-table th{width:30%}footer{margin-top:auto;padding-top:8px;border-top:1px solid #ddd;text-align:center;color:#999;font-size:8px}footer span{float:right}.contract-signatures{margin-top:30px}.signature-grid{display:grid;grid-template-columns:1fr 1fr;gap:36px;margin-top:25px}.signature-grid>div{display:grid}.typed-signature{min-height:45px;border-bottom:1px solid #17233f;font:32px cursive;color:#111}.signature-grid strong{min-height:25px;border-bottom:1px solid #ddd;padding-top:8px}.signature-grid i{font-size:8px;color:#999;font-style:normal;margin-bottom:7px}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}`;
+}
+
 function renderContracts() {
   const today = new Date().toISOString().slice(0, 10);
-  document.querySelector("#view-contracts").innerHTML = `
-    <div class="maker-layout">
-      <section class="panel maker-form-panel">
-        <div class="panel-header"><h2>New Contract</h2></div>
-        <form id="contractMakerForm" class="maker-form">
-          <div class="form-grid">
-            <label>Contract title<input name="title" required placeholder="Video Editing Agreement" /></label>
-            <label>Client<select name="client" required><option value="">Select client</option>${documentClientsOptions()}</select></label>
-            <label>Effective date<input name="effectiveDate" type="date" required value="${today}" /></label>
-            <label>Service fee<input name="fee" required placeholder="$500 per month" /></label>
-            <label class="form-wide">Scope of work<textarea name="scope" required placeholder="Editing services, deliverables, and turnaround"></textarea></label>
-            <label class="form-wide">Payment terms<textarea name="paymentTerms" required placeholder="Payment schedule and accepted method"></textarea></label>
-            <label class="form-wide">Additional terms<textarea name="terms" placeholder="Revisions, confidentiality, ownership, and termination"></textarea></label>
-          </div>
-          <button class="primary-button" type="submit">Save Contract</button>
-        </form>
-      </section>
-      <section class="panel maker-library">
-        <div class="panel-header"><h2>Contracts</h2><span class="muted">${contracts.length} saved</span></div>
-        <div class="document-list">
-          ${contracts.length ? contracts.map(contract => `<article class="document-row"><div><strong>${escapeAttr(contract.title)}</strong><span>${escapeAttr(contract.client)} · ${escapeAttr(contract.effectiveDate)}</span></div><span>${escapeAttr(contract.fee)}</span><div class="row-actions"><button class="ghost-button" data-action="print-contract" data-id="${contract.id}">Print / PDF</button><button class="danger-button" data-action="delete-contract" data-id="${contract.id}">Delete</button></div></article>`).join("") : `<div class="empty-state"><strong>No contracts yet</strong></div>`}
-        </div>
-      </section>
-    </div>`;
-  document.querySelector("#contractMakerForm").onsubmit = event => {
-    event.preventDefault();
-    const data = Object.fromEntries(new FormData(event.currentTarget).entries());
-    contracts.unshift({ id: crypto.randomUUID(), ...data });
-    localStorage.setItem("vbeContracts", JSON.stringify(contracts));
-    renderContracts();
-  };
+  const field = (label, name, value = "", type = "text") => `<label>${label}<input name="${name}" type="${type}" value="${escapeAttr(value)}" /></label>`;
+  const area = (label, name, value = "", wide = true) => `<label${wide ? ` class="form-wide"` : ""}>${label}<textarea name="${name}">${escapeAttr(value)}</textarea></label>`;
+  document.querySelector("#view-contracts").innerHTML = `<div class="contract-maker-layout"><section class="panel contract-form-panel"><div class="panel-header"><h2>Service Agreement</h2></div><form id="contractMakerForm" class="maker-form">
+    <details open><summary>Agreement overview</summary><div class="form-grid">${field("Agreement title", "title", "CREATIVE MARKETING AGENCY")}${field("Subtitle", "subtitle", "Video Editing and Creative Services")}${field("Agreement date", "agreementDate", today, "date")}${field("Effective date", "effectiveDate", today, "date")}${field("Contract reference", "reference", "0001")}${field("Agreement term", "term", "Month-to-month")}</div></details>
+    <details open><summary>Service provider and client</summary><div class="form-grid">${field("Provider name", "providerName", "Visuals by Essi")}<label>Saved client<select name="client"><option value="">Select client</option>${documentClientsOptions()}</select></label>${area("Provider address", "providerAddress", "Gonzaga, Cagayan, Philippines", false)}${area("Client address", "clientAddress", "", false)}${field("Provider email", "providerEmail", "visualsbyessi@gmail.com", "email")}${field("Client email", "clientEmail", "", "email")}${field("Provider phone", "providerPhone")}${field("Client phone", "clientPhone")}${field("Client / company name", "clientName")}</div></details>
+    <details><summary>Scope and production</summary><div class="form-grid">${area("Scope introduction", "scopeIntro", "The Service Provider agrees to deliver the following creative services to the Client.")}${field("Deliverable", "deliverable", "Video Advertisement")}${field("Quantity / timeline", "quantityTimeline", "2 videos / day")}${field("Deliverable notes", "deliverableNotes", "See production terms")}${area("Production deliverables", "productionTerms", "Each video includes professional editing and post-production, captions or subtitles as agreed, platform-optimized formatting, music or sound design when specified, and final export in the agreed resolution and format. The Client must provide all required raw assets.")}</div></details>
+    <details><summary>Revisions and payment</summary><div class="form-grid">${area("Revision rounds", "revisionRounds", "Unlimited rounds of revisions at no additional charge.", false)}${area("Turnaround time", "turnaround", "Revised videos will be delivered within the agreed turnaround after confirmation that usable assets were received.", false)}${area("Asset confirmation", "assetConfirmation", "The turnaround clock begins after written confirmation that all required assets are complete and usable.")}${field("Service fee", "fee", "$15 USD per video")}${field("Invoice schedule", "invoiceSchedule", "Invoices are issued weekly.")}${field("Payment method", "paymentMethod", "Bank Transfer")}${area("Service suspension", "serviceSuspension", "The Service Provider may pause deliverables when payment remains outstanding beyond the agreed payment period.")}</div></details>
+    <details><summary>Legal terms</summary><div class="form-grid">${area("Client responsibilities", "clientResponsibilities", "Provide required assets, review content direction, designate a primary contact, provide clear revision feedback, and approve final deliverables in writing.")}${area("Intellectual property and ownership", "ownershipTerms", "Upon full payment, the Client owns the final deliverables. The Service Provider retains ownership of raw files, templates, presets, and proprietary assets and may use final work in its portfolio unless otherwise requested in writing.")}${area("Confidentiality", "confidentiality", "Both parties will keep confidential all non-public information exchanged in connection with this Agreement.")}${area("Term details", "termDetails", "This Agreement begins on the Effective Date and continues until terminated.", false)}${area("Notice period", "noticePeriod", "Either party may terminate with written notice. Payment remains due for services already delivered.", false)}${area("Immediate termination", "immediateTermination", "The Service Provider may terminate immediately upon material breach, including non-payment.")}${area("Limitation of liability", "liability", "The Service Provider's total liability will not exceed fees paid during the three months before the event giving rise to the claim.")}${area("Governing law and disputes", "governingLaw", "The parties will first attempt good-faith resolution. Unresolved disputes will follow the governing law and venue agreed by both parties.")}${area("General provisions", "generalProvisions", "Entire Agreement; written amendments; severability; force majeure; and no waiver.")}</div></details>
+    <details open><summary>Signatures</summary><div class="form-grid">${field("Provider signature", "providerSignature")}${field("Client signature", "clientSignature")}${field("Provider printed name", "providerPrintedName", "Ian Jay Soliva")}${field("Client printed name", "clientPrintedName")}${field("Provider title", "providerTitle", "Video Editor")}${field("Client title", "clientTitle")}${field("Provider signing date", "providerSignDate", today, "date")}${field("Client signing date", "clientSignDate", today, "date")}</div></details>
+    <div class="contract-form-actions"><button class="ghost-button" type="submit">Save Contract</button><button class="primary-button" id="printContractDraft" type="button">Download PDF</button></div></form><div class="document-list contract-saved-list">${contracts.map(contract => `<article class="document-row"><div><strong>${escapeAttr(contract.title)}</strong><span>${escapeAttr(contract.clientName || contract.client || "Client")}</span></div><div class="row-actions"><button class="ghost-button" data-action="print-contract" data-id="${contract.id}">PDF</button><button class="danger-button" data-action="delete-contract" data-id="${contract.id}">Delete</button></div></article>`).join("")}</div></section>
+    <section class="panel contract-preview-panel"><div class="panel-header"><h2>Live Preview</h2><span class="muted">Letter · 5 pages</span></div><div id="contractLivePreview" class="contract-preview-stack"></div></section></div>`;
+  const form = document.querySelector("#contractMakerForm");
+  form.addEventListener("input", updateContractPreview);
+  form.elements.client.onchange = event => { const contact = invoiceContacts.find(item => item.name === event.target.value); form.elements.clientName.value = contact?.name || event.target.value; form.elements.clientEmail.value = contact?.email || ""; form.elements.clientAddress.value = contact?.address || ""; updateContractPreview(); };
+  form.onsubmit = event => { event.preventDefault(); const contract = readContractDraft(event.currentTarget); contracts.unshift({ id: crypto.randomUUID(), ...contract }); localStorage.setItem("vbeContracts", JSON.stringify(contracts)); alert("Contract saved."); renderContracts(); };
+  document.querySelector("#printContractDraft").onclick = () => printContract(readContractDraft());
+  updateContractPreview();
 }
 
 function printDocument(title, body) {
@@ -1992,7 +2027,7 @@ document.addEventListener("click", async (event) => {
   if (action === "print-contract") {
     const contract = contracts.find(item => item.id === actionButtonEl.dataset.id);
     if (!contract) return;
-    printDocument(contract.title, `<header><div><h1>${escapeAttr(contract.title)}</h1><strong>VISUALS BY ESSI</strong></div><div>Effective: ${escapeAttr(contract.effectiveDate)}</div></header><p>This agreement is entered into between <strong>Visuals by Essi</strong> and <strong>${escapeAttr(contract.client)}</strong>.</p><div class="section"><h2>Scope of Work</h2>${escapeAttr(contract.scope)}</div><div class="section"><h2>Service Fee</h2>${escapeAttr(contract.fee)}</div><div class="section"><h2>Payment Terms</h2>${escapeAttr(contract.paymentTerms)}</div><div class="section"><h2>Additional Terms</h2>${escapeAttr(contract.terms || "None")}</div><div class="signatures"><div class="signature">Visuals by Essi<br>Date:</div><div class="signature">${escapeAttr(contract.client)}<br>Date:</div></div>`);
+    printContract(contract);
     return;
   }
 
