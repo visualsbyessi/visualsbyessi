@@ -25,6 +25,10 @@ const clients = [
     { type: "Hard", invoiceRate: 20, editorRate: 500, billing: "video" }
   ] }
 ];
+const deletedClientNames = new Set(JSON.parse(localStorage.getItem("vbeDeletedClientNames") || "[]"));
+for (let index = clients.length - 1; index >= 0; index -= 1) {
+  if (deletedClientNames.has(clients[index].name.toLowerCase())) clients.splice(index, 1);
+}
 
 const SUPABASE_URL = "https://hbyvddtczxjmjiommlcg.supabase.co";
 const SUPABASE_KEY = "sb_publishable_JpMQkv99uAgopgWsRtxwOA_RWiB6-2S";
@@ -94,7 +98,7 @@ async function loadRemoteData() {
             billing: rate.billing === "2_minutes" ? "minutes" : (rate.billing || "video"),
             billingMinutes: Number(rate.billingMinutes ?? rate.billing_minutes ?? (rate.billing === "2_minutes" ? 2 : 0))
           })) : []
-        })));
+        })).filter(client => !deletedClientNames.has(client.name.toLowerCase())));
       } catch (error) {
         remoteClientsEnabled = false;
         console.warn("Client management needs the clients table update.", error);
@@ -184,8 +188,12 @@ async function saveClientRemote(client) {
 }
 
 async function deleteClientRemote(client) {
-  if (!remoteEnabled || !remoteClientsEnabled || !client?.id || String(client.id).startsWith("local-") || String(client.id).startsWith("legacy-")) return;
-  await supabaseRequest(`/clients?id=eq.${encodeURIComponent(client.id)}`, { method: "DELETE" });
+  const id = String(client?.id || "");
+  if (!id || id.startsWith("local-") || id.startsWith("legacy-")) return false;
+  if (!remoteEnabled || !remoteClientsEnabled) throw new Error("Supabase client sync is unavailable.");
+  const deleted = await supabaseRequest(`/clients?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!deleted.length) throw new Error("Supabase did not delete the client. Check the clients DELETE policy.");
+  return true;
 }
 
 function formIsOpen() {
@@ -384,14 +392,11 @@ async function saveQuickLinkRemote(link) {
 
 async function deleteQuickLinkRemote(link) {
   const id = String(link.id || "");
-  const hasRemoteId = remoteEnabled && id.length > 20 && !id.startsWith("sample-") && !id.startsWith("local-");
-  if (!hasRemoteId) return;
-  try {
-    await supabaseRequest(`/quick_links?id=eq.${id}`, { method: "DELETE" });
-  } catch (error) {
-    alert("Could not delete quick link from Supabase. Please run the quick_links SQL permissions again.");
-    console.error(error);
-  }
+  const hasRemoteId = remoteEnabled && id && !id.startsWith("sample-") && !id.startsWith("local-");
+  if (!hasRemoteId) return false;
+  const deleted = await supabaseRequest(`/quick_links?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!deleted.length) throw new Error("Supabase did not delete the quick link. Check the quick_links DELETE policy.");
+  return true;
 }
 
 async function cleanupExpiredPaidProjects() {
@@ -2022,8 +2027,16 @@ document.addEventListener("click", async (event) => {
   if (action === "delete-client") {
     const client = clients.find(item => String(item.id) === String(actionButtonEl.dataset.id));
     if (!client || !confirm(`Delete ${client.name}? Existing projects will be kept.`)) return;
+    try {
+      await deleteClientRemote(client);
+    } catch (error) {
+      alert("The client was not deleted from Supabase, so it was kept in the app. Check the clients DELETE policy.");
+      console.error(error);
+      return;
+    }
     clients.splice(clients.indexOf(client), 1);
-    await deleteClientRemote(client);
+    deletedClientNames.add(client.name.toLowerCase());
+    localStorage.setItem("vbeDeletedClientNames", JSON.stringify([...deletedClientNames]));
     renderAll();
     setView("clients");
     return;
@@ -2144,12 +2157,19 @@ document.addEventListener("click", async (event) => {
     const link = quickLinks.find(item => String(item.id) === actionButtonEl.dataset.id);
     if (!link) return;
     if (!confirm(`Delete ${link.name}?`)) return;
+    try {
+      await deleteQuickLinkRemote(link);
+    } catch (error) {
+      alert("The quick link was not deleted from Supabase, so it was kept in the app. Check the quick_links DELETE policy.");
+      console.error(error);
+      return;
+    }
     const index = quickLinks.findIndex(item => String(item.id) === String(link.id));
     if (index > -1) quickLinks.splice(index, 1);
     saveQuickLinks();
     renderAll();
     setView("links");
-    deleteQuickLinkRemote(link).then(saveQuickLinks);
+    saveQuickLinks();
   }
 
   if (action === "edit-editor") {
@@ -2373,6 +2393,8 @@ document.querySelector("#clientForm").onsubmit = async (event) => {
   const previousName = client.name;
   client.name = name;
   client.rates = rates;
+  deletedClientNames.delete(name.toLowerCase());
+  localStorage.setItem("vbeDeletedClientNames", JSON.stringify([...deletedClientNames]));
   if (!existing) clients.push(client);
   if (existing && previousName !== name) {
     for (const project of projects.filter(item => item.client === previousName)) {
