@@ -1301,7 +1301,9 @@ function renderClientPage(id, title, rows) {
 
 function renderWorkspace(editor = activeEditor, target = "#view-workspace") {
   const clientRows = activeProjects().filter(p => allowedEditors(p.client).includes(editor));
-  const addNicolas = canCreateNicolasProject(editor) && target === "#view-workspace";
+  const accessibleClients = clients.filter(client => allowedEditors(client.name).includes(editor));
+  const canAddProject = target === "#view-workspace" && accessibleClients.length > 0;
+  const defaultAddClient = accessibleClients[0]?.name || "";
   const modeRows = workspaceMode === "all"
     ? clientRows
     : workspaceMode === "available"
@@ -1321,7 +1323,7 @@ function renderWorkspace(editor = activeEditor, target = "#view-workspace") {
           <input class="table-search" type="search" placeholder="Search projects..." value="${searchTerm}" />
         </div>
         <div class="workspace-actions">
-          ${addNicolas ? `<button class="primary-button" data-action="add-nicolas">${icon("plus")} Add Nicolas Project</button>` : ""}
+          ${canAddProject ? `<button class="primary-button" data-action="add-workspace-project" data-client="${escapeAttr(defaultAddClient)}">${icon("plus")} Add Project</button>` : ""}
           <div class="segmented">
             <button class="${workspaceMode === "mine" ? "active" : ""}" data-mode="mine">My Projects</button>
             <button class="${workspaceMode === "available" ? "active" : ""}" data-mode="available">Available</button>
@@ -1640,8 +1642,9 @@ function printModernInvoice() {
   if (!preview || !invoice) return;
   const popup = window.open("", "_blank", "width=900,height=900");
   if (!popup) return alert("Please allow popups to download the invoice PDF.");
-  popup.document.write(`<!doctype html><html><head><title>${escapeAttr(invoice.number || "Invoice")}</title><link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"><style>@page{size:A4;margin:0}*{box-sizing:border-box}body{margin:0;background:#fff;color:#161616;font:11px 'Space Mono',monospace}.modern-invoice-paper{width:210mm;height:297mm;padding:17mm 18mm;background:#fff;display:flex;flex-direction:column}.modern-invoice-head{display:flex;justify-content:space-between;gap:20px}.modern-invoice-head>div:first-child{display:grid;gap:3px}.modern-invoice-head>div:last-child{display:grid;text-align:right;line-height:1.5}.modern-invoice-head b,.modern-invoice-client span,.modern-invoice-bottom span{font-size:9px;letter-spacing:.08em}.modern-invoice-client{display:grid;gap:3px;margin:0}.modern-invoice-client span,.modern-invoice-bottom span{color:#d9602f;font-weight:700}.modern-invoice-client small,.modern-invoice-bottom small{color:#5e5e5e}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{padding:8px 4px;border-bottom:1px dotted #aaa;text-align:left;background:#fff;color:#161616}thead th{background:#d9602f;color:#fff;border:0}th:not(:first-child),td:not(:first-child){text-align:right}.modern-invoice-total{display:flex;justify-content:space-between;margin-top:7px;padding:11px 13px;background:#d9602f;color:#fff;font-weight:700}.modern-invoice-bottom{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:auto}.modern-invoice-bottom>div{display:grid;gap:4px}.modern-invoice-wordmark{margin-top:24px;color:#d9602f;font-size:52px;font-weight:700;letter-spacing:-.08em}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}</style></head><body><div class="modern-invoice-paper">${preview.innerHTML}</div><script>window.onload=()=>window.print()<\/script></body></html>`);
-  popup.document.write(`<style>@page{size:Letter portrait;margin:0}html,body{width:8.5in!important;height:11in!important;margin:0!important;overflow:hidden!important}.modern-invoice-paper{width:8.5in!important;height:11in!important;padding:.62in .68in!important;overflow:hidden!important}.modern-invoice-paper th:nth-child(2),.modern-invoice-paper td:nth-child(2){width:18%;white-space:nowrap}.modern-invoice-paper th:nth-child(3),.modern-invoice-paper td:nth-child(3){width:12%;white-space:nowrap}.modern-invoice-paper th:nth-child(4),.modern-invoice-paper td:nth-child(4){width:18%;white-space:nowrap}</style>`);
+  popup.document.write(`<!doctype html><html><head><title>${escapeAttr(invoice.number || "Invoice")}</title><link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"><style>
+    @page{size:Letter portrait;margin:0}*{box-sizing:border-box}html,body{width:8.5in;height:11in;margin:0;overflow:hidden}body{background:#fff;color:#161616;font:11px 'Space Mono',monospace}.modern-invoice-paper{width:8.5in;height:11in;padding:.58in .65in;background:#fff;display:flex;flex-direction:column;overflow:hidden}.modern-invoice-head{display:flex;justify-content:space-between;gap:24px;flex:0 0 auto}.modern-invoice-head>div{display:grid;gap:3px}.modern-invoice-head>div:last-child{text-align:right;line-height:1.45}.modern-invoice-head b,.modern-invoice-client span,.modern-invoice-bottom span{font-size:9px;letter-spacing:.08em}.modern-invoice-client span,.modern-invoice-bottom span{color:#d9602f;font-weight:700}.modern-invoice-client small,.modern-invoice-bottom small{color:#5e5e5e}table{width:100%;table-layout:fixed;border-collapse:collapse;margin-top:18px;flex:0 0 auto}th,td{padding:7px 5px;border-bottom:1px dotted #aaa;text-align:left;background:#fff;color:#161616}thead th{background:#d9602f;color:#fff;border:0}th:not(:first-child),td:not(:first-child){text-align:right}th:nth-child(2),td:nth-child(2){width:18%}th:nth-child(3),td:nth-child(3){width:12%}th:nth-child(4),td:nth-child(4){width:18%}.modern-invoice-total{display:flex;justify-content:space-between;margin-top:7px;padding:10px 12px;background:#d9602f;color:#fff;font-weight:700;flex:0 0 auto}.modern-invoice-bottom{display:grid;grid-template-columns:1fr 1fr;gap:36px;margin-top:auto;padding-top:24px;flex:0 0 auto}.modern-invoice-bottom>div{display:grid;gap:3px;align-content:start}.modern-invoice-wordmark{margin-top:18px;color:#d9602f;font-size:48px;line-height:1;font-weight:700;letter-spacing:-.08em;flex:0 0 auto}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+  </style></head><body><div class="modern-invoice-paper">${preview.innerHTML}</div><script>window.onload=()=>window.print()<\/script></body></html>`);
   popup.document.close();
 }
 
@@ -1667,6 +1670,15 @@ function renderInvoices() {
     form.elements.clientName.value = contact?.name || event.target.value;
     form.elements.clientEmail.value = contact?.email || "";
     form.elements.clientAddress.value = contact?.address || "";
+    const completed = activeProjects().filter(project => project.client === event.target.value && project.status === "Done");
+    const total = completed.reduce((sum, project) => sum + invoiceAmount(project), 0);
+    if (completed.length) {
+      document.querySelector("#invoiceLineItems").innerHTML = invoiceItemRow({
+        description: `${event.target.value} completed work (${completed.length} project${completed.length === 1 ? "" : "s"})`,
+        quantity: 1,
+        rate: total
+      });
+    }
     updateInvoicePreview();
   };
   form.elements.savedBusiness.onchange = event => { const item = invoiceBusinesses.find(entry => entry.name === event.target.value); if (!item) return; form.elements.fromName.value = item.name || ""; form.elements.fromEmail.value = item.email || ""; form.elements.fromAddress.value = item.address || ""; updateInvoicePreview(); };
@@ -1796,7 +1808,9 @@ function configureProjectForm(clientPreset = "") {
   const editingProject = projects.find(project => String(project.id) === String(editingProjectId));
   const selectedClient = editingProject?.client || clientPreset || clientSelect.value || clients[0]?.name || "";
   const editorLockedToCurrentUser = !isAdmin();
-  const clientNames = clients.map(client => client.name);
+  const clientNames = clients
+    .filter(client => isAdmin() || allowedEditors(client.name).includes(currentUser))
+    .map(client => client.name);
   if (editingProject?.client && !clientNames.includes(editingProject.client)) clientNames.push(editingProject.client);
   clientSelect.innerHTML = clientNames.map(name => `<option value="${escapeAttr(name)}">${escapeAttr(name)}</option>`).join("");
   clientSelect.value = selectedClient;
@@ -1832,7 +1846,7 @@ function configureProjectForm(clientPreset = "") {
   document.querySelectorAll("[data-form-field]").forEach(field => {
     const name = field.dataset.formField;
     const shouldHide =
-      (name === "client" && !isAdmin()) ||
+      (name === "client" && !isAdmin() && clientNames.length <= 1) ||
       (name === "duration" && !rateBillingMinutes(rateForProject({ client: clientSelect.value, type: typeSelect.value }))) ||
       (editorLockedToCurrentUser && name === "editor");
     field.classList.toggle("hidden", shouldHide);
@@ -2104,6 +2118,10 @@ document.addEventListener("click", async (event) => {
 
   if (action === "add-nicolas") {
     openModal("Nicolas");
+  }
+
+  if (action === "add-workspace-project") {
+    openModal(actionButtonEl.dataset.client || "");
   }
 
   if (action === "add-link") {
@@ -2431,8 +2449,11 @@ document.querySelector("#linkForm").onsubmit = (event) => {
 document.querySelector("#projectForm").onsubmit = async (event) => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.currentTarget).entries());
-  if (!isAdmin()) return;
   const selectedClient = data.client;
+  if (!isAdmin() && !allowedEditors(selectedClient).includes(currentUser)) {
+    alert("You do not have access to add projects for this client.");
+    return;
+  }
   const configuredRate = rateForProject({ client: selectedClient, type: data.type });
   if (!clientByName(selectedClient) || !configuredRate) return;
   const existingProject = projects.find(item => String(item.id) === String(editingProjectId));
@@ -2453,14 +2474,14 @@ document.querySelector("#projectForm").onsubmit = async (event) => {
     rawLink: data.raw,
     notes: data.notes || "",
     duration: rateBillingMinutes(configuredRate) ? parseDuration(data.duration) : 0,
-    editor: data.editor === "Unassigned" ? "" : data.editor
+    editor: isAdmin() ? (data.editor === "Unassigned" ? "" : data.editor) : currentUser
   });
   if (!existingProject && isDuplicateProject(project)) {
     alert("This project already exists. Duplicate entry was not added.");
     return;
   }
   if (!existingProject && !isDuplicateProject(project)) projects.unshift(project);
-  const shouldNotifyAssigned = isAdmin() && project.editor && previousEditor !== project.editor;
+  const shouldNotifyAssigned = project.editor && previousEditor !== project.editor;
   const shouldNotifyUnassignedAdded = isAdmin() && !existingProject && !project.editor;
   event.currentTarget.reset();
   closeModal();
