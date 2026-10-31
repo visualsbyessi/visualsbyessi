@@ -1878,8 +1878,12 @@ body.night-mode .native-invoice-form .invoice-section-title { color: var(--text)
 .contract-page table { width: 100%; min-width: 0; border-collapse: collapse; table-layout: fixed; }
 .contract-page th,
 .contract-page td { padding: 5px; border: 1px solid #d9dde5; text-align: left; vertical-align: top; white-space: normal; }
+.contract-page table,
+.contract-page tbody,
+.contract-page tr,
+.contract-page td { background: #fff !important; color: #17233f !important; }
 .contract-page thead th,
-.contract-page .contract-key-table th { background: #17233f; color: #fff; }
+.contract-page .contract-key-table th { background: #17233f !important; color: #fff !important; }
 .contract-page .contract-key-table th { width: 30%; }
 .contract-page footer { margin-top: auto; padding-top: 6px; border-top: 1px solid #d9dde5; color: #9299a6; text-align: center; font-size: 6px; }
 .contract-page footer span { float: right; }
